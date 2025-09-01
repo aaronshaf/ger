@@ -166,9 +166,6 @@ export const AiServiceLive = Layer.succeed(
             }),
         })
 
-        // Debug: Log the raw output to help troubleshoot
-        yield* Effect.logDebug(`AI tool raw output: ${JSON.stringify(result.stdout)}`)
-
         // Extract response tag
         const responseMatch = result.stdout.match(/<response>([\s\S]*?)<\/response>/i)
 

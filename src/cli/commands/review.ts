@@ -390,9 +390,11 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               .pipe(
                 Effect.catchTag('AiResponseParseError', (error) =>
                   Effect.gen(function* () {
-                    if (options.debug) {
-                      yield* Console.error(`[DEBUG] AI output:\n${error.rawOutput}`)
-                    }
+                    yield* Console.error(`✗ Failed to parse AI response: ${error.message}`)
+                    yield* Console.error('Raw AI output:')
+                    yield* Console.error('-'.repeat(80))
+                    yield* Console.error(error.rawOutput || 'No output captured')
+                    yield* Console.error('-'.repeat(80))
                     return yield* Effect.fail(error)
                   }),
                 ),
@@ -467,9 +469,11 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               .pipe(
                 Effect.catchTag('AiResponseParseError', (error) =>
                   Effect.gen(function* () {
-                    if (options.debug) {
-                      yield* Console.error(`[DEBUG] AI output:\n${error.rawOutput}`)
-                    }
+                    yield* Console.error(`✗ Failed to parse AI response: ${error.message}`)
+                    yield* Console.error('Raw AI output:')
+                    yield* Console.error('-'.repeat(80))
+                    yield* Console.error(error.rawOutput || 'No output captured')
+                    yield* Console.error('-'.repeat(80))
                     return yield* Effect.fail(error)
                   }),
                 ),
