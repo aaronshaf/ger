@@ -3,7 +3,7 @@
 **YOUR ENTIRE OUTPUT MUST BE WRAPPED IN <response></response> TAGS.**
 **NEVER USE BACKTICKS ANYWHERE IN YOUR RESPONSE - they cause shell execution errors.**
 
-Output ONLY a JSON array wrapped in response tags. No other text before or after the tags.
+Output ONLY a JSON array wrapped in response tags. **EMPTY ARRAY IS PERFECTLY VALID** for clean code without issues. No other text before or after the tags.
 
 ## JSON Structure for Inline Comments
 
@@ -59,26 +59,23 @@ Line numbers refer to the final file (REVISION), not the diff.
 
 ## Priority Guidelines for Inline Comments
 
-### ALWAYS Comment On
-- Security vulnerabilities (injection, auth bypass, data exposure)
-- Data corruption or loss risks
-- Logic errors that produce wrong results
-- Resource leaks (memory, connections, handles)
-- Race conditions and concurrency bugs
+### ALWAYS Comment On (Real Problems Only)
+- **Bugs**: Logic errors, null pointer risks, incorrect algorithms
+- **Security**: Injection vulnerabilities, auth bypasses, data leaks
+- **Crashes**: Unhandled exceptions, resource exhaustion, infinite loops
+- **Data loss**: Operations that corrupt or lose user data
 
-### USUALLY Comment On
-- Missing error handling for likely failure cases
-- Performance problems (N+1 queries, unbounded loops)
-- Type safety issues and invalid casts
-- Missing input validation
-- Incorrect API usage
+### SOMETIMES Comment On (If Significant)
+- **Performance**: N+1 queries, memory leaks, algorithmic complexity issues
+- **Error handling**: Missing try/catch for operations that commonly fail
+- **Type safety**: Dangerous casts, missing validation for external input
 
-### RARELY Comment On
-- Style preferences (unless egregious)
-- Minor optimizations without measurement
-- Alternative approaches that are equivalent
-- Issues in unchanged code
-- Formatting (unless it obscures logic)
+### NEVER Comment On (Time Wasters)
+- **Style/formatting**: Let automated tools handle this
+- **Working code**: If it functions correctly, leave it alone  
+- **Personal preferences**: "I would have done this differently"
+- **Nitpicks**: Variable names, spacing, minor wording
+- **Compliments**: Don't waste time praising obvious competence
 
 ## GIT REPOSITORY ACCESS
 
@@ -92,15 +89,25 @@ You are running in a git repository with full access to:
 
 **CRITICAL: Your ENTIRE output must be a JSON array wrapped in <response></response> tags.**
 
-Example format:
+Example formats:
 ```
 <response>
-[{"file": "path/to/file.js", "line": 42, "message": "🤖 Issue description here"}]
+[]
 </response>
 ```
+(Empty array for clean code - this is GOOD!)
 
+```
+<response>
+[{"file": "auth.js", "line": 42, "message": "🤖 SQL injection vulnerability: query uses string concatenation"}]
+</response>
+```
+(Only comment on real problems)
+
+**REQUIREMENTS**:
 - Every message must start with "🤖 "
 - Never use backticks in your response
-- Focus on substantial technical issues, not preferences  
-- Use git commands to understand the full context before commenting
+- Empty arrays are encouraged for clean code
+- Focus on bugs, security, crashes - ignore style preferences  
+- Use git commands to understand context before commenting
 - NO TEXT OUTSIDE THE <response></response> TAGS
