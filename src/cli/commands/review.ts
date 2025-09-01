@@ -407,8 +407,14 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               yield* Console.log(`[DEBUG] Inline response:\n${inlineResponse}`)
             }
 
-            // Response is already extracted by runPrompt
-            const extractedInlineResponse = inlineResponse
+            // Response is already extracted by runPrompt from <response> tags
+            const extractedInlineResponse = inlineResponse.trim()
+
+            if (options.debug) {
+              yield* Console.log(
+                `[DEBUG] Extracted response for parsing:\n${extractedInlineResponse}`,
+              )
+            }
 
             // Parse JSON array from response
             const inlineCommentsArray = yield* Effect.tryPromise({
@@ -418,8 +424,9 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               Effect.catchAll((error) =>
                 Effect.gen(function* () {
                   yield* Console.error(`✗ Failed to parse inline comments JSON: ${error}`)
+                  yield* Console.error(`Raw extracted response: "${extractedInlineResponse}"`)
                   if (!options.debug) {
-                    yield* Console.error('Run with --debug to see raw AI output')
+                    yield* Console.error('Run with --debug to see full AI output')
                   }
                   return yield* Effect.fail(error)
                 }),
@@ -549,8 +556,6 @@ const handleInlineComments = (
         } else {
           yield* Console.log('→ Inline comments not posted')
         }
-      } else {
-        yield* Console.log('\n→ No valid inline comments to post')
       }
     }
   })
