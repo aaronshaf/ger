@@ -1,4 +1,4 @@
-import { Effect, pipe, Schema } from 'effect'
+import { Effect, pipe, Schema, Layer } from 'effect'
 import { AiService } from '@/services/ai'
 import { commentCommandWithInput } from './comment'
 import { Console } from 'effect'
@@ -7,6 +7,13 @@ import type { CommentInfo } from '@/schemas/gerrit'
 import { sanitizeCDATA, escapeXML } from '@/utils/shell-safety'
 import { formatDiffPretty } from '@/utils/diff-formatters'
 import { formatDate } from '@/utils/formatters'
+import {
+  formatChangeAsXML,
+  formatCommentsAsXML,
+  formatMessagesAsXML,
+  flattenComments,
+} from '@/utils/review-formatters'
+import { buildEnhancedPrompt } from '@/utils/review-prompt-builder'
 import * as fs from 'node:fs/promises'
 import * as fsSync from 'node:fs'
 import * as os from 'node:os'
@@ -14,6 +21,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 import * as readline from 'node:readline'
+import { GitWorktreeService, GitWorktreeServiceLive } from '@/services/git-worktree'
 
 // Get the directory of this module
 const __filename = fileURLToPath(import.meta.url)
@@ -178,7 +186,7 @@ const validateAndFixInlineComments = (
     return validComments
   })
 
-// Helper to get change data and format as XML string
+// Legacy helper for backward compatibility (will be removed)
 const getChangeDataAsXml = (changeId: string): Effect.Effect<string, ApiError, GerritApiService> =>
   Effect.gen(function* () {
     const gerritApi = yield* GerritApiService
@@ -190,83 +198,17 @@ const getChangeDataAsXml = (changeId: string): Effect.Effect<string, ApiError, G
     const commentsMap = yield* gerritApi.getComments(changeId)
     const messages = yield* gerritApi.getMessages(changeId)
 
-    // Flatten comments from all files
-    const comments: CommentInfo[] = []
-    for (const [path, fileComments] of Object.entries(commentsMap)) {
-      for (const comment of fileComments) {
-        comments.push({ ...comment, path })
-      }
-    }
+    const comments = flattenComments(commentsMap)
 
-    // Build XML string
+    // Build XML string using helper functions
     const xmlLines: string[] = []
     xmlLines.push(`<?xml version="1.0" encoding="UTF-8"?>`)
     xmlLines.push(`<show_result>`)
     xmlLines.push(`  <status>success</status>`)
-    xmlLines.push(`  <change>`)
-    xmlLines.push(`    <id>${escapeXML(change.change_id)}</id>`)
-    xmlLines.push(`    <number>${change._number}</number>`)
-    xmlLines.push(`    <subject><![CDATA[${sanitizeCDATA(change.subject)}]]></subject>`)
-    xmlLines.push(`    <status>${escapeXML(change.status)}</status>`)
-    xmlLines.push(`    <project>${escapeXML(change.project)}</project>`)
-    xmlLines.push(`    <branch>${escapeXML(change.branch)}</branch>`)
-    xmlLines.push(`    <owner>`)
-    if (change.owner?.name) {
-      xmlLines.push(`      <name><![CDATA[${sanitizeCDATA(change.owner.name)}]]></name>`)
-    }
-    if (change.owner?.email) {
-      xmlLines.push(`      <email>${escapeXML(change.owner.email)}</email>`)
-    }
-    xmlLines.push(`    </owner>`)
-    xmlLines.push(`    <created>${escapeXML(change.created || '')}</created>`)
-    xmlLines.push(`    <updated>${escapeXML(change.updated || '')}</updated>`)
-    xmlLines.push(`  </change>`)
+    xmlLines.push(...formatChangeAsXML(change))
     xmlLines.push(`  <diff><![CDATA[${sanitizeCDATA(diff)}]]></diff>`)
-
-    // Comments section
-    xmlLines.push(`  <comments>`)
-    xmlLines.push(`    <count>${comments.length}</count>`)
-    for (const comment of comments) {
-      xmlLines.push(`    <comment>`)
-      if (comment.id) xmlLines.push(`      <id>${escapeXML(comment.id)}</id>`)
-      if (comment.path)
-        xmlLines.push(`      <path><![CDATA[${sanitizeCDATA(comment.path)}]]></path>`)
-      if (comment.line) xmlLines.push(`      <line>${comment.line}</line>`)
-      if (comment.author?.name) {
-        xmlLines.push(`      <author><![CDATA[${sanitizeCDATA(comment.author.name)}]]></author>`)
-      }
-      if (comment.updated) xmlLines.push(`      <updated>${escapeXML(comment.updated)}</updated>`)
-      if (comment.message) {
-        xmlLines.push(`      <message><![CDATA[${sanitizeCDATA(comment.message)}]]></message>`)
-      }
-      if (comment.unresolved) xmlLines.push(`      <unresolved>true</unresolved>`)
-      xmlLines.push(`    </comment>`)
-    }
-    xmlLines.push(`  </comments>`)
-
-    // Messages section
-    xmlLines.push(`  <messages>`)
-    xmlLines.push(`    <count>${messages.length}</count>`)
-    for (const message of messages) {
-      xmlLines.push(`    <message>`)
-      xmlLines.push(`      <id>${escapeXML(message.id)}</id>`)
-      if (message.author?.name) {
-        xmlLines.push(`      <author><![CDATA[${sanitizeCDATA(message.author.name)}]]></author>`)
-      }
-      if (message.author?._account_id) {
-        xmlLines.push(`      <author_id>${message.author._account_id}</author_id>`)
-      }
-      xmlLines.push(`      <date>${escapeXML(message.date)}</date>`)
-      if (message._revision_number) {
-        xmlLines.push(`      <revision>${message._revision_number}</revision>`)
-      }
-      if (message.tag) {
-        xmlLines.push(`      <tag>${escapeXML(message.tag)}</tag>`)
-      }
-      xmlLines.push(`      <message><![CDATA[${sanitizeCDATA(message.message)}]]></message>`)
-      xmlLines.push(`    </message>`)
-    }
-    xmlLines.push(`  </messages>`)
+    xmlLines.push(...formatCommentsAsXML(comments))
+    xmlLines.push(...formatMessagesAsXML(messages))
     xmlLines.push(`</show_result>`)
 
     return xmlLines.join('\n')
@@ -286,13 +228,7 @@ const getChangeDataAsPretty = (
     const commentsMap = yield* gerritApi.getComments(changeId)
     const messages = yield* gerritApi.getMessages(changeId)
 
-    // Flatten comments from all files
-    const comments: CommentInfo[] = []
-    for (const [path, fileComments] of Object.entries(commentsMap)) {
-      for (const comment of fileComments) {
-        comments.push({ ...comment, path })
-      }
-    }
+    const comments = flattenComments(commentsMap)
 
     // Build pretty string
     const lines: string[] = []
@@ -379,18 +315,22 @@ const promptUser = (message: string): Effect.Effect<boolean, never> =>
 export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
   Effect.gen(function* () {
     const aiService = yield* AiService
+    const gitService = yield* GitWorktreeService
 
     // Load default prompts first
     const prompts = yield* loadDefaultPrompts
 
-    // Check for AI tool availability first
+    // Validate preconditions
+    yield* gitService.validatePreconditions()
+
+    // Check for AI tool availability
     yield* Console.log('→ Checking for AI tool availability...')
     const aiTool = yield* aiService
       .detectAiTool()
       .pipe(Effect.catchTag('NoAiToolFoundError', (error) => Effect.fail(new Error(error.message))))
     yield* Console.log(`✓ Found AI tool: ${aiTool}`)
 
-    // Load custom review prompt if provided via --prompt option
+    // Load custom review prompt if provided
     let userReviewPrompt = prompts.defaultReviewPrompt
 
     if (options.prompt) {
@@ -404,81 +344,171 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
       }
     }
 
-    // Combine user prompt with system prompts for each stage
-    const inlinePrompt = `${userReviewPrompt}\n\n${prompts.inlineReviewSystemPrompt}`
-    const overallPrompt = `${userReviewPrompt}\n\n${prompts.overallReviewSystemPrompt}`
+    // Use Effect's resource management for worktree lifecycle
+    yield* Effect.acquireUseRelease(
+      // Acquire: Create worktree and setup
+      Effect.gen(function* () {
+        const worktreeInfo = yield* gitService.createWorktree(changeId)
+        yield* gitService.fetchAndCheckoutPatchset(worktreeInfo)
+        return worktreeInfo
+      }),
 
-    yield* Console.log(`→ Fetching change data for ${changeId}...`)
-
-    // Stage 1: Generate inline comments
-    yield* Console.log(`→ Generating inline comments for change ${changeId}...`)
-
-    // Get change data in XML format for inline review
-    const xmlData = yield* getChangeDataAsXml(changeId)
-
-    if (options.debug) {
-      yield* Console.log('[DEBUG] Running AI for inline comments...')
-    }
-
-    // Run inline review
-    const inlineResponse = yield* aiService.runPrompt(inlinePrompt, xmlData).pipe(
-      Effect.catchTag('AiResponseParseError', (error) =>
+      // Use: Run the enhanced review process
+      (worktreeInfo) =>
         Effect.gen(function* () {
-          if (options.debug) {
-            yield* Console.error(`[DEBUG] AI output:\n${error.rawOutput}`)
+          // Switch to worktree directory
+          const originalCwd = process.cwd()
+          process.chdir(worktreeInfo.path)
+
+          try {
+            // Get changed files from git
+            const changedFiles = yield* gitService.getChangedFiles()
+
+            yield* Console.log(`→ Found ${changedFiles.length} changed files`)
+            if (options.debug) {
+              yield* Console.log(`[DEBUG] Changed files: ${changedFiles.join(', ')}`)
+            }
+
+            // Stage 1: Generate inline comments
+            yield* Console.log(`→ Generating inline comments for change ${changeId}...`)
+
+            const inlinePrompt = yield* buildEnhancedPrompt(
+              userReviewPrompt,
+              prompts.inlineReviewSystemPrompt,
+              changeId,
+              changedFiles,
+            )
+
+            if (options.debug) {
+              yield* Console.log('[DEBUG] Running AI for inline comments...')
+              yield* Console.log(`[DEBUG] Working directory: ${worktreeInfo.path}`)
+            }
+
+            // Run inline review with worktree as working directory
+            const inlineResponse = yield* aiService
+              .runPrompt(inlinePrompt, '', { cwd: worktreeInfo.path })
+              .pipe(
+                Effect.catchTag('AiResponseParseError', (error) =>
+                  Effect.gen(function* () {
+                    if (options.debug) {
+                      yield* Console.error(`[DEBUG] AI output:\n${error.rawOutput}`)
+                    }
+                    return yield* Effect.fail(error)
+                  }),
+                ),
+                Effect.catchTag('AiServiceError', (error) =>
+                  Effect.die(new Error(`AI service error: ${error.message}`)),
+                ),
+              )
+
+            if (options.debug) {
+              yield* Console.log(`[DEBUG] Inline response:\n${inlineResponse}`)
+            }
+
+            // Extract response from tags
+            const extractedInlineResponse = yield* aiService.extractResponseTag(inlineResponse)
+
+            // Parse JSON array from response
+            const inlineCommentsArray = yield* Effect.tryPromise({
+              try: () => Promise.resolve(JSON.parse(extractedInlineResponse)),
+              catch: (error) => new Error(`Invalid JSON response: ${error}`),
+            }).pipe(
+              Effect.catchAll((error) =>
+                Effect.gen(function* () {
+                  yield* Console.error(`✗ Failed to parse inline comments JSON: ${error}`)
+                  if (!options.debug) {
+                    yield* Console.error('Run with --debug to see raw AI output')
+                  }
+                  return yield* Effect.fail(error)
+                }),
+              ),
+            )
+
+            // Validate that the response is an array
+            if (!Array.isArray(inlineCommentsArray)) {
+              yield* Console.error('✗ AI response is not an array of comments')
+              return yield* Effect.fail(new Error('Invalid inline comments format'))
+            }
+
+            // Validate and fix inline comments
+            const originalCount = inlineCommentsArray.length
+            const inlineComments = yield* validateAndFixInlineComments(
+              inlineCommentsArray,
+              changedFiles,
+            )
+            const validCount = inlineComments.length
+
+            if (originalCount > validCount) {
+              yield* Console.log(
+                `→ Filtered ${originalCount - validCount} invalid comments, ${validCount} remain`,
+              )
+            }
+
+            // Handle inline comments output/posting
+            yield* handleInlineComments(inlineComments, changeId, options)
+
+            // Stage 2: Generate overall review comment
+            yield* Console.log(`→ Generating overall review comment for change ${changeId}...`)
+
+            const overallPrompt = yield* buildEnhancedPrompt(
+              userReviewPrompt,
+              prompts.overallReviewSystemPrompt,
+              changeId,
+              changedFiles,
+            )
+
+            if (options.debug) {
+              yield* Console.log('[DEBUG] Running AI for overall review...')
+            }
+
+            // Run overall review
+            const overallResponse = yield* aiService
+              .runPrompt(overallPrompt, '', { cwd: worktreeInfo.path })
+              .pipe(
+                Effect.catchTag('AiResponseParseError', (error) =>
+                  Effect.gen(function* () {
+                    if (options.debug) {
+                      yield* Console.error(`[DEBUG] AI output:\n${error.rawOutput}`)
+                    }
+                    return yield* Effect.fail(error)
+                  }),
+                ),
+                Effect.catchTag('AiServiceError', (error) =>
+                  Effect.die(new Error(`AI service error: ${error.message}`)),
+                ),
+              )
+
+            if (options.debug) {
+              yield* Console.log(`[DEBUG] Overall response:\n${overallResponse}`)
+            }
+
+            // Extract response from tags
+            const extractedOverallResponse = yield* aiService.extractResponseTag(overallResponse)
+
+            // Handle overall review output/posting
+            yield* handleOverallReview(extractedOverallResponse, changeId, options)
+          } finally {
+            // Always restore original working directory
+            process.chdir(originalCwd)
           }
-          return yield* Effect.fail(error)
+
+          yield* Console.log(`✓ Review complete for ${changeId}`)
         }),
-      ),
-      Effect.catchTag('AiServiceError', (error) =>
-        Effect.die(new Error(`AI service error: ${error.message}`)),
-      ),
+
+      // Release: Always cleanup worktree
+      (worktreeInfo) => gitService.cleanup(worktreeInfo),
     )
+  })
 
-    if (options.debug) {
-      yield* Console.log(`[DEBUG] Inline response:\n${inlineResponse}`)
-    }
-
-    // Parse JSON array from response using Effect
-    const inlineCommentsArray = yield* Effect.tryPromise({
-      try: () => Promise.resolve(JSON.parse(inlineResponse)),
-      catch: (error) => new Error(`Invalid JSON response: ${error}`),
-    }).pipe(
-      Effect.catchAll((error) =>
-        Effect.gen(function* () {
-          yield* Console.error(`✗ Failed to parse inline comments JSON: ${error}`)
-          if (!options.debug) {
-            yield* Console.error('Run with --debug to see raw AI output')
-          }
-          return yield* Effect.fail(error)
-        }),
-      ),
-    )
-
-    // Validate that the response is an array
-    if (!Array.isArray(inlineCommentsArray)) {
-      yield* Console.error('✗ AI response is not an array of comments')
-      return yield* Effect.fail(new Error('Invalid inline comments format'))
-    }
-
-    // Get available files for validation
-    const gerritApi = yield* GerritApiService
-    const files = yield* gerritApi.getFiles(changeId)
-    const availableFiles = Object.keys(files)
-
-    // Validate and fix inline comments
-    const originalCount = inlineCommentsArray.length
-    const inlineComments = yield* validateAndFixInlineComments(inlineCommentsArray, availableFiles)
-    const validCount = inlineComments.length
-
-    if (originalCount > validCount) {
-      yield* Console.log(
-        `→ Filtered ${originalCount - validCount} invalid comments, ${validCount} remain`,
-      )
-    }
-
-    // If not in comment mode, just output the inline comments
+// Helper function to handle inline comments output/posting
+const handleInlineComments = (
+  inlineComments: InlineComment[],
+  changeId: string,
+  options: ReviewOptions,
+): Effect.Effect<void, Error, GerritApiService> =>
+  Effect.gen(function* () {
     if (!options.comment) {
+      // Display mode
       if (inlineComments.length > 0) {
         yield* Console.log('\n━━━━━━ INLINE COMMENTS ━━━━━━')
         for (const comment of inlineComments) {
@@ -489,7 +519,7 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
         yield* Console.log('\n→ No inline comments')
       }
     } else {
-      // In comment mode, handle posting
+      // Comment posting mode
       if (inlineComments.length > 0) {
         yield* Console.log('\n━━━━━━ INLINE COMMENTS TO POST ━━━━━━')
         for (const comment of inlineComments) {
@@ -498,27 +528,20 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
         }
         yield* Console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
-        // Ask for confirmation unless --yes is provided
-        const shouldPost = options.yes
-          ? true
-          : yield* promptUser('\nPost these inline comments to Gerrit?')
+        const shouldPost =
+          options.yes || (yield* promptUser('\nPost these inline comments to Gerrit?'))
 
         if (shouldPost) {
-          if (inlineComments.length === 0) {
-            yield* Console.log('→ No valid comments to post after validation')
-          } else {
-            // Post inline comments using the new direct input method
-            yield* pipe(
-              commentCommandWithInput(changeId, JSON.stringify(inlineComments), { batch: true }),
-              Effect.catchAll((error) =>
-                Effect.gen(function* () {
-                  yield* Console.error(`✗ Failed to post inline comments: ${error}`)
-                  return yield* Effect.fail(error)
-                }),
-              ),
-            )
-            yield* Console.log(`✓ Inline comments posted for ${changeId}`)
-          }
+          yield* pipe(
+            commentCommandWithInput(changeId, JSON.stringify(inlineComments), { batch: true }),
+            Effect.catchAll((error) =>
+              Effect.gen(function* () {
+                yield* Console.error(`✗ Failed to post inline comments: ${error}`)
+                return yield* Effect.fail(error)
+              }),
+            ),
+          )
+          yield* Console.log(`✓ Inline comments posted for ${changeId}`)
         } else {
           yield* Console.log('→ Inline comments not posted')
         }
@@ -526,54 +549,29 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
         yield* Console.log('\n→ No valid inline comments to post')
       }
     }
+  })
 
-    // Stage 2: Generate overall review comment
-    yield* Console.log(`→ Generating overall review comment for change ${changeId}...`)
-
-    // Get change data in regular format for overall review
-    const prettyData = yield* getChangeDataAsPretty(changeId)
-
-    if (options.debug) {
-      yield* Console.log('[DEBUG] Running AI for overall review...')
-    }
-
-    // Run overall review
-    const overallResponse = yield* aiService.runPrompt(overallPrompt, prettyData).pipe(
-      Effect.catchTag('AiResponseParseError', (error) =>
-        Effect.gen(function* () {
-          if (options.debug) {
-            yield* Console.error(`[DEBUG] AI output:\n${error.rawOutput}`)
-          }
-          return yield* Effect.fail(error)
-        }),
-      ),
-      Effect.catchTag('AiServiceError', (error) =>
-        Effect.die(new Error(`AI service error: ${error.message}`)),
-      ),
-    )
-
-    if (options.debug) {
-      yield* Console.log(`[DEBUG] Overall response:\n${overallResponse}`)
-    }
-
-    // If not in comment mode, just output the review
+// Helper function to handle overall review output/posting
+const handleOverallReview = (
+  overallResponse: string,
+  changeId: string,
+  options: ReviewOptions,
+): Effect.Effect<void, Error, GerritApiService> =>
+  Effect.gen(function* () {
     if (!options.comment) {
+      // Display mode
       yield* Console.log('\n━━━━━━ OVERALL REVIEW ━━━━━━')
       yield* Console.log(overallResponse)
       yield* Console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
     } else {
-      // In comment mode, handle posting
+      // Comment posting mode
       yield* Console.log('\n━━━━━━ OVERALL REVIEW TO POST ━━━━━━')
       yield* Console.log(overallResponse)
       yield* Console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
-      // Ask for confirmation unless --yes is provided
-      const shouldPost = options.yes
-        ? true
-        : yield* promptUser('\nPost this overall review to Gerrit?')
+      const shouldPost = options.yes || (yield* promptUser('\nPost this overall review to Gerrit?'))
 
       if (shouldPost) {
-        // Post overall comment using the new direct input method
         yield* pipe(
           commentCommandWithInput(changeId, overallResponse, {}),
           Effect.catchAll((error) =>
@@ -588,6 +586,4 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
         yield* Console.log('→ Overall review not posted')
       }
     }
-
-    yield* Console.log(`✓ Review complete for ${changeId}`)
   })

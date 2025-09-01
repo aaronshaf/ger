@@ -25,7 +25,8 @@ export class AiService extends Context.Tag('AiService')<
   {
     readonly runPrompt: (
       prompt: string,
-      input: string,
+      input?: string,
+      options?: { cwd?: string },
     ) => Effect.Effect<string, AiServiceError | NoAiToolFoundError | AiResponseParseError>
     readonly detectAiTool: () => Effect.Effect<string, NoAiToolFoundError>
     readonly extractResponseTag: (output: string) => Effect.Effect<string, AiResponseParseError>
@@ -76,7 +77,7 @@ export const AiServiceLive = Layer.succeed(
         return responseMatch[1].trim()
       }),
 
-    runPrompt: (prompt: string, input: string) =>
+    runPrompt: (prompt: string, input: string = '', options: { cwd?: string } = {}) =>
       Effect.gen(function* () {
         const tool = yield* Effect.gen(function* () {
           // Try to detect available AI tools in order of preference
@@ -101,7 +102,7 @@ export const AiServiceLive = Layer.succeed(
         })
 
         // Prepare the command based on the tool
-        const fullInput = `${prompt}\n\n${input}`
+        const fullInput = input ? `${prompt}\n\n${input}` : prompt
         let command: string
 
         switch (tool) {
@@ -127,6 +128,7 @@ export const AiServiceLive = Layer.succeed(
             const child = require('node:child_process').spawn(command, {
               shell: true,
               stdio: ['pipe', 'pipe', 'pipe'],
+              cwd: options.cwd || process.cwd(),
             })
 
             // Write input to stdin
@@ -164,13 +166,22 @@ export const AiServiceLive = Layer.succeed(
             }),
         })
 
+        // Debug: Log the raw output to help troubleshoot
+        yield* Effect.logDebug(`AI tool raw output: ${JSON.stringify(result.stdout)}`)
+
         // Extract response tag
         const responseMatch = result.stdout.match(/<response>([\s\S]*?)<\/response>/i)
 
         if (!responseMatch || !responseMatch[1]) {
+          // Enhanced error message with truncated output for debugging
+          const truncatedOutput =
+            result.stdout.length > 500
+              ? result.stdout.substring(0, 500) + '...[truncated]'
+              : result.stdout
+
           return yield* Effect.fail(
             new AiResponseParseError({
-              message: 'No <response> tag found in AI output',
+              message: `No <response> tag found in AI output. Raw output: ${truncatedOutput}`,
               rawOutput: result.stdout,
             }),
           )
