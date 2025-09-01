@@ -319,7 +319,7 @@ Line 3
       const mockAiService = AiService.of({
         detectAiTool: () => Effect.succeed('claude'),
         extractResponseTag: (output: string) => Effect.succeed('extracted response'),
-        runPrompt: (prompt: string, input: string) => {
+        runPrompt: (prompt: string, input?: string, options?: { cwd?: string }) => {
           expect(prompt).toBe('Test prompt')
           expect(input).toBe('Test input')
           return Effect.succeed('extracted response')
@@ -340,7 +340,7 @@ Line 3
       const mockAiService = AiService.of({
         detectAiTool: () => Effect.succeed('llm'),
         extractResponseTag: (output: string) => Effect.succeed('llm response'),
-        runPrompt: (prompt: string, input: string) => {
+        runPrompt: (prompt: string, input?: string, options?: { cwd?: string }) => {
           return Effect.succeed('llm response')
         },
       })
@@ -457,7 +457,7 @@ Line 3
       const mockAiService = AiService.of({
         detectAiTool: () => Effect.succeed('claude'),
         extractResponseTag: (output: string) => Effect.succeed('response content'),
-        runPrompt: (prompt: string, input: string) => {
+        runPrompt: (prompt: string, input?: string, options?: { cwd?: string }) => {
           // Verify the prompt and input are passed correctly
           expect(prompt).toBe('System: Analyze this code')
           expect(input).toBe('function test() { return 42; }')
