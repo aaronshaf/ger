@@ -79,12 +79,12 @@ export const AiServiceEnhanced = Layer.effect(
         return responseMatch[1].trim()
       })
 
-    const runPrompt = (prompt: string, input: string) =>
+    const runPrompt = (prompt: string, input: string = '', options: { cwd?: string } = {}) =>
       Effect.gen(function* () {
         const tool = yield* detectAiTool()
 
         // Prepare the command based on the tool
-        const fullInput = `${prompt}\n\n${input}`
+        const fullInput = input ? `${prompt}\n\n${input}` : prompt
         let command: string
 
         switch (tool) {
@@ -114,6 +114,7 @@ export const AiServiceEnhanced = Layer.effect(
             const child = require('node:child_process').spawn(command, {
               shell: true,
               stdio: ['pipe', 'pipe', 'pipe'],
+              cwd: options.cwd || process.cwd(),
             })
 
             // Write input to stdin

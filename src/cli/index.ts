@@ -26,6 +26,7 @@ import { Effect } from 'effect'
 import { GerritApiServiceLive } from '@/api/gerrit'
 import { ConfigServiceLive } from '@/services/config'
 import { AiServiceLive } from '@/services/ai-enhanced'
+import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { abandonCommand } from './commands/abandon'
 import { commentCommand } from './commands/comment'
 import { commentsCommand } from './commands/comments'
@@ -409,6 +410,7 @@ Examples:
         Effect.provide(AiServiceLive),
         Effect.provide(GerritApiServiceLive),
         Effect.provide(ConfigServiceLive),
+        Effect.provide(GitWorktreeServiceLive),
       )
       await Effect.runPromise(effect)
     } catch (error) {
