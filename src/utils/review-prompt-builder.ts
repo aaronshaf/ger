@@ -20,15 +20,17 @@ export const buildEnhancedPrompt = (
 
     const promptLines: string[] = []
 
+    // System prompt FIRST - critical for response format instructions
+    promptLines.push(systemPrompt.trim())
+    promptLines.push('')
+
     // User custom prompt (if provided)
     if (userPrompt.trim()) {
+      promptLines.push('ADDITIONAL INSTRUCTIONS FROM USER:')
+      promptLines.push('===================================')
       promptLines.push(userPrompt.trim())
       promptLines.push('')
     }
-
-    // System prompt
-    promptLines.push(systemPrompt.trim())
-    promptLines.push('')
 
     // Change metadata section
     promptLines.push('CHANGE INFORMATION')

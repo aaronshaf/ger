@@ -80,9 +80,27 @@ Line numbers refer to the final file (REVISION), not the diff.
 - Issues in unchanged code
 - Formatting (unless it obscures logic)
 
+## GIT REPOSITORY ACCESS
+
+You are running in a git repository with full access to:
+- git diff, git show, git log for understanding changes and context
+- git blame for code ownership and history
+- All project files for architectural understanding
+- Use these commands to provide comprehensive, accurate reviews
+
 ## FINAL REMINDER
 
-Your ENTIRE output must be a JSON array wrapped in <response></response> tags.
-Every message must start with "🤖 ".
-Never use backticks in your response.
-Focus on substantial technical issues, not preferences.
+**CRITICAL: Your ENTIRE output must be a JSON array wrapped in <response></response> tags.**
+
+Example format:
+```
+<response>
+[{"file": "path/to/file.js", "line": 42, "message": "🤖 Issue description here"}]
+</response>
+```
+
+- Every message must start with "🤖 "
+- Never use backticks in your response
+- Focus on substantial technical issues, not preferences  
+- Use git commands to understand the full context before commenting
+- NO TEXT OUTSIDE THE <response></response> TAGS

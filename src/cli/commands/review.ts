@@ -407,8 +407,8 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               yield* Console.log(`[DEBUG] Inline response:\n${inlineResponse}`)
             }
 
-            // Extract response from tags
-            const extractedInlineResponse = yield* aiService.extractResponseTag(inlineResponse)
+            // Response is already extracted by runPrompt
+            const extractedInlineResponse = inlineResponse
 
             // Parse JSON array from response
             const inlineCommentsArray = yield* Effect.tryPromise({
@@ -486,8 +486,8 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               yield* Console.log(`[DEBUG] Overall response:\n${overallResponse}`)
             }
 
-            // Extract response from tags
-            const extractedOverallResponse = yield* aiService.extractResponseTag(overallResponse)
+            // Response is already extracted by runPrompt
+            const extractedOverallResponse = overallResponse
 
             // Handle overall review output/posting
             yield* handleOverallReview(extractedOverallResponse, changeId, options)
