@@ -331,7 +331,7 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
 
     if (availableStrategies.length === 0) {
       return yield* Effect.fail(
-        new Error('No AI tools available. Please install claude, gemini, or codex CLI.'),
+        new Error('No AI tools available. Please install claude, gemini, or opencode CLI.'),
       )
     }
 
