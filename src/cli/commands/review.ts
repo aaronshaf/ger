@@ -1,5 +1,5 @@
 import { Effect, pipe, Schema, Layer } from 'effect'
-import { AiService } from '@/services/ai'
+import { ReviewStrategyService, type ReviewStrategy } from '@/services/review-strategy'
 import { commentCommandWithInput } from './comment'
 import { Console } from 'effect'
 import { type ApiError, GerritApiService } from '@/api/gerrit'
@@ -89,6 +89,8 @@ interface ReviewOptions {
   comment?: boolean
   yes?: boolean
   prompt?: string
+  provider?: string
+  systemPrompt?: string
 }
 
 // Schema for validating AI-generated inline comments
@@ -314,21 +316,28 @@ const promptUser = (message: string): Effect.Effect<boolean, never> =>
 
 export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
   Effect.gen(function* () {
-    const aiService = yield* AiService
+    const reviewStrategy = yield* ReviewStrategyService
     const gitService = yield* GitWorktreeService
 
-    // Load default prompts first
+    // Load default prompts
     const prompts = yield* loadDefaultPrompts
 
     // Validate preconditions
     yield* gitService.validatePreconditions()
 
-    // Check for AI tool availability
-    yield* Console.log('→ Checking for AI tool availability...')
-    const aiTool = yield* aiService
-      .detectAiTool()
-      .pipe(Effect.catchTag('NoAiToolFoundError', (error) => Effect.fail(new Error(error.message))))
-    yield* Console.log(`✓ Found AI tool: ${aiTool}`)
+    // Check for available AI strategies
+    yield* Console.log('→ Checking AI tool availability...')
+    const availableStrategies = yield* reviewStrategy.getAvailableStrategies()
+
+    if (availableStrategies.length === 0) {
+      return yield* Effect.fail(
+        new Error('No AI tools available. Please install claude, gemini, or codex CLI.'),
+      )
+    }
+
+    // Select strategy based on user preference
+    const selectedStrategy = yield* reviewStrategy.selectStrategy(options.provider)
+    yield* Console.log(`✓ Using AI tool: ${selectedStrategy.name}`)
 
     // Load custom review prompt if provided
     let userReviewPrompt = prompts.defaultReviewPrompt
@@ -379,35 +388,32 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               changedFiles,
             )
 
+            // Run inline review using selected strategy
             if (options.debug) {
-              yield* Console.log('[DEBUG] Running AI for inline comments...')
+              yield* Console.log(`[DEBUG] Running inline review with ${selectedStrategy.name}`)
               yield* Console.log(`[DEBUG] Working directory: ${worktreeInfo.path}`)
             }
 
-            // Run inline review with worktree as working directory
-            const inlineResponse = yield* aiService
-              .runPrompt(inlinePrompt, '', { cwd: worktreeInfo.path })
+            const inlineResponse = yield* reviewStrategy
+              .executeWithStrategy(selectedStrategy, inlinePrompt, {
+                cwd: worktreeInfo.path,
+                systemPrompt: options.systemPrompt || prompts.inlineReviewSystemPrompt,
+              })
               .pipe(
-                Effect.catchTag('AiResponseParseError', (error) =>
+                Effect.catchTag('ReviewStrategyError', (error) =>
                   Effect.gen(function* () {
-                    yield* Console.error(`✗ Failed to parse AI response: ${error.message}`)
-                    yield* Console.error('Raw AI output:')
-                    yield* Console.error('-'.repeat(80))
-                    yield* Console.error(error.rawOutput || 'No output captured')
-                    yield* Console.error('-'.repeat(80))
-                    return yield* Effect.fail(error)
+                    yield* Console.error(`✗ Inline review failed: ${error.message}`)
+                    return yield* Effect.fail(new Error(error.message))
                   }),
-                ),
-                Effect.catchTag('AiServiceError', (error) =>
-                  Effect.die(new Error(`AI service error: ${error.message}`)),
                 ),
               )
 
             if (options.debug) {
-              yield* Console.log(`[DEBUG] Inline response:\n${inlineResponse}`)
+              yield* Console.log(`[DEBUG] Inline review completed`)
+              yield* Console.log(`[DEBUG] Response length: ${inlineResponse.length} chars`)
             }
 
-            // Response is already extracted by runPrompt from <response> tags
+            // Response content is ready for parsing
             const extractedInlineResponse = inlineResponse.trim()
 
             if (options.debug) {
@@ -466,35 +472,32 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
               changedFiles,
             )
 
+            // Run overall review using selected strategy
             if (options.debug) {
-              yield* Console.log('[DEBUG] Running AI for overall review...')
+              yield* Console.log(`[DEBUG] Running overall review with ${selectedStrategy.name}`)
             }
 
-            // Run overall review
-            const overallResponse = yield* aiService
-              .runPrompt(overallPrompt, '', { cwd: worktreeInfo.path })
+            const overallResponse = yield* reviewStrategy
+              .executeWithStrategy(selectedStrategy, overallPrompt, {
+                cwd: worktreeInfo.path,
+                systemPrompt: options.systemPrompt || prompts.overallReviewSystemPrompt,
+              })
               .pipe(
-                Effect.catchTag('AiResponseParseError', (error) =>
+                Effect.catchTag('ReviewStrategyError', (error) =>
                   Effect.gen(function* () {
-                    yield* Console.error(`✗ Failed to parse AI response: ${error.message}`)
-                    yield* Console.error('Raw AI output:')
-                    yield* Console.error('-'.repeat(80))
-                    yield* Console.error(error.rawOutput || 'No output captured')
-                    yield* Console.error('-'.repeat(80))
-                    return yield* Effect.fail(error)
+                    yield* Console.error(`✗ Overall review failed: ${error.message}`)
+                    return yield* Effect.fail(new Error(error.message))
                   }),
-                ),
-                Effect.catchTag('AiServiceError', (error) =>
-                  Effect.die(new Error(`AI service error: ${error.message}`)),
                 ),
               )
 
             if (options.debug) {
-              yield* Console.log(`[DEBUG] Overall response:\n${overallResponse}`)
+              yield* Console.log(`[DEBUG] Overall review completed`)
+              yield* Console.log(`[DEBUG] Response length: ${overallResponse.length} chars`)
             }
 
-            // Response is already extracted by runPrompt
-            const extractedOverallResponse = overallResponse
+            // Response content is ready for use
+            const extractedOverallResponse = overallResponse.trim()
 
             // Handle overall review output/posting
             yield* handleOverallReview(extractedOverallResponse, changeId, options)
