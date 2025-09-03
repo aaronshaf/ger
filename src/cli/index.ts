@@ -368,12 +368,12 @@ program
   .option('-y, --yes', 'Skip confirmation prompts when posting comments')
   .option('--debug', 'Show debug output including AI responses')
   .option('--prompt <file>', 'Path to custom review prompt file (e.g., ~/prompts/review.md)')
-  .option('--provider <provider>', 'Preferred AI provider (claude-sdk, claude, gemini, opencode)')
+  .option('--tool <tool>', 'Preferred AI tool (claude, gemini, opencode)')
   .option('--system-prompt <prompt>', 'Custom system prompt for the AI')
   .addHelpText(
     'after',
     `
-This command uses AI (Claude SDK, claude CLI, gemini CLI, or opencode CLI) to review a Gerrit change.
+This command uses AI (claude CLI, gemini CLI, or opencode CLI) to review a Gerrit change.
 It performs a two-stage review process:
 
 1. Generates inline comments for specific code issues
@@ -384,7 +384,7 @@ Use --comment to post the review to Gerrit (with confirmation prompts).
 Use --comment --yes to post without confirmation.
 
 Requirements:
-  - One of these AI tools must be available: Claude SDK (ANTHROPIC_API_KEY), claude CLI, gemini CLI, or opencode CLI
+  - One of these AI tools must be available: claude CLI, gemini CLI, or opencode CLI
   - Gerrit credentials must be configured (run 'ger setup' first)
 
 Examples:
@@ -397,6 +397,9 @@ Examples:
   # Review and auto-post comments without prompting
   $ ger review 12345 --comment --yes
   
+  # Use specific AI tool
+  $ ger review 12345 --tool gemini
+  
   # Show debug output to troubleshoot issues
   $ ger review 12345 --debug
 `,
@@ -408,7 +411,7 @@ Examples:
         yes: options.yes,
         debug: options.debug,
         prompt: options.prompt,
-        provider: options.provider,
+        tool: options.tool,
         systemPrompt: options.systemPrompt,
       }).pipe(
         Effect.provide(ReviewStrategyServiceLive),

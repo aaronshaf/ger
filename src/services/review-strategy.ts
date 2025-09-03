@@ -4,6 +4,13 @@ import { promisify } from 'node:util'
 
 const execAsync = promisify(exec)
 
+// Shared response extraction logic for all AI tools
+const extractResponse = (stdout: string): string => {
+  // Extract response from <response> tags or use full output
+  const responseMatch = stdout.match(/<response>([\s\S]*?)<\/response>/i)
+  return responseMatch ? responseMatch[1].trim() : stdout.trim()
+}
+
 // Simple strategy focused only on review needs
 export class ReviewStrategyError extends Data.TaggedError('ReviewStrategyError')<{
   message: string
@@ -75,9 +82,7 @@ export const claudeCliStrategy: ReviewStrategy = {
           }),
       })
 
-      // Extract response from <response> tags or use full output
-      const responseMatch = result.stdout.match(/<response>([\s\S]*?)<\/response>/i)
-      return responseMatch ? responseMatch[1].trim() : result.stdout.trim()
+      return extractResponse(result.stdout)
     }),
 }
 
@@ -135,7 +140,7 @@ export const geminiCliStrategy: ReviewStrategy = {
           }),
       })
 
-      return result.stdout.trim()
+      return extractResponse(result.stdout)
     }),
 }
 
@@ -193,7 +198,7 @@ export const openCodeCliStrategy: ReviewStrategy = {
           }),
       })
 
-      return result.stdout.trim()
+      return extractResponse(result.stdout)
     }),
 }
 

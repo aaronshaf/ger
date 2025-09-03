@@ -41,10 +41,15 @@ Gerrit uses a LIMITED markdown subset. Follow these rules EXACTLY:
 
 **YOUR ENTIRE OUTPUT MUST BE WRAPPED IN <response></response> TAGS.**
 
+**IMMEDIATE TASK**: Analyze the code changes provided below and write a comprehensive engineering review.
+
 Start with "🤖 [Your Tool Name] ([Your Model])" then provide a **CONCISE** engineering assessment. Examples:
 - If you are Claude Sonnet 4: "🤖 Claude (Sonnet 4)"
+- If you are Gemini: "🤖 Gemini (1.5 Pro)" or "🤖 Gemini (1.5 Flash)"
 - For clean code: "No significant issues found. Change is ready for merge."
 - For problematic code: Focus only on critical/important issues, skip minor concerns
+
+**YOU MUST ANALYZE THE PROVIDED CODE CHANGES AND WRITE A REVIEW NOW.**
 
 ## Example Output Format
 
@@ -175,3 +180,9 @@ CRITICAL FORMATTING RULES:
 - Use exactly 4 spaces to start each line of code blocks  
 - Keep code blocks simple and readable
 - Add proper spacing for readability
+
+## TASK SUMMARY
+
+**ANALYZE THE CODE CHANGES PROVIDED ABOVE AND WRITE YOUR ENGINEERING REVIEW IMMEDIATELY.**
+
+Do not ask for clarification. Do not wait for more input. Analyze the provided code changes, git history, and changed files, then write your review following the format requirements above.

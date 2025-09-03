@@ -7,11 +7,6 @@ interface MockDeps {
   spawn: (command: string, options: any) => any
 }
 
-// Mock for Claude SDK
-interface MockClaudeSDK {
-  query: any // Will be a Bun mock function
-}
-
 // Test implementation that mirrors the real strategy structure
 const createTestStrategy = (name: string, command: string, flags: string[], deps: MockDeps) => ({
   name,
@@ -71,47 +66,6 @@ const createTestStrategy = (name: string, command: string, flags: string[], deps
       // Extract response from <response> tags or use full output
       const responseMatch = result.stdout.match(/<response>([\s\S]*?)<\/response>/i)
       return responseMatch ? responseMatch[1].trim() : result.stdout.trim()
-    }),
-})
-
-// Test implementation for Claude SDK strategy
-const createSDKStrategy = (
-  name: string,
-  deps: { sdk: MockClaudeSDK | null; hasApiKey: boolean },
-) => ({
-  name,
-  isAvailable: () =>
-    Effect.gen(function* () {
-      return Boolean(deps.sdk && deps.hasApiKey)
-    }),
-  executeReview: (prompt: string, options: { cwd?: string; systemPrompt?: string } = {}) =>
-    Effect.gen(function* () {
-      if (!deps.sdk) {
-        return yield* Effect.fail(new Error(`${name} not available`))
-      }
-
-      const result = yield* Effect.tryPromise({
-        try: async () => {
-          for await (const message of deps.sdk!.query({
-            prompt,
-            options: {
-              maxTurns: 3,
-              customSystemPrompt: options.systemPrompt || 'You are a code review expert.',
-              allowedTools: ['Read', 'Grep', 'Glob'],
-              cwd: options.cwd,
-            },
-          })) {
-            if (message.type === 'result' && message.subtype === 'success' && message.result) {
-              return message.result
-            }
-          }
-          throw new Error('No result received')
-        },
-        catch: (error) =>
-          new Error(`${name} failed: ${error instanceof Error ? error.message : String(error)}`),
-      })
-
-      return result
     }),
 })
 
@@ -266,6 +220,14 @@ describe('Review Strategy', () => {
       expect(response).toBe('Gemini response')
       expect(mockSpawn).toHaveBeenCalledWith('gemini -p', expect.any(Object))
     })
+
+    it('should extract response from tags', async () => {
+      setupSuccessfulExecution('<response>Gemini tagged content</response>')
+
+      const response = await Effect.runPromise(geminiStrategy.executeReview('Test prompt'))
+
+      expect(response).toBe('Gemini tagged content')
+    })
   })
 
   describe('OpenCode CLI Strategy', () => {
@@ -295,120 +257,13 @@ describe('Review Strategy', () => {
       expect(response).toBe('OpenCode response')
       expect(mockSpawn).toHaveBeenCalledWith('opencode -p', expect.any(Object))
     })
-  })
 
-  describe('Claude SDK Strategy', () => {
-    let mockSDK: MockClaudeSDK
-    let claudeSDKStrategy: any
+    it('should extract response from tags', async () => {
+      setupSuccessfulExecution('<response>OpenCode tagged content</response>')
 
-    beforeEach(() => {
-      mockSDK = {
-        query: mock(),
-      }
+      const response = await Effect.runPromise(opencodeStrategy.executeReview('Test prompt'))
 
-      claudeSDKStrategy = createSDKStrategy('Claude SDK', {
-        sdk: mockSDK,
-        hasApiKey: true,
-      })
-    })
-
-    it('should check availability when SDK and API key are present', async () => {
-      const available = await Effect.runPromise(claudeSDKStrategy.isAvailable())
-
-      expect(available).toBe(true)
-    })
-
-    it('should check availability when SDK is missing', async () => {
-      const strategy = createSDKStrategy('Claude SDK', {
-        sdk: null,
-        hasApiKey: true,
-      })
-
-      const available = await Effect.runPromise(strategy.isAvailable())
-
-      expect(available).toBe(false)
-    })
-
-    it('should check availability when API key is missing', async () => {
-      const strategy = createSDKStrategy('Claude SDK', {
-        sdk: mockSDK,
-        hasApiKey: false,
-      })
-
-      const available = await Effect.runPromise(strategy.isAvailable())
-
-      expect(available).toBe(false)
-    })
-
-    it('should execute review successfully', async () => {
-      mockSDK.query = mock(async function* () {
-        yield { type: 'message', content: 'Thinking...' }
-        yield { type: 'result', subtype: 'success', result: 'Claude SDK response' }
-      })
-
-      const response = await Effect.runPromise(
-        claudeSDKStrategy.executeReview('Test prompt', { cwd: '/tmp' }),
-      )
-
-      expect(response).toBe('Claude SDK response')
-      expect(mockSDK.query).toHaveBeenCalledWith({
-        prompt: 'Test prompt',
-        options: {
-          maxTurns: 3,
-          customSystemPrompt: 'You are a code review expert.',
-          allowedTools: ['Read', 'Grep', 'Glob'],
-          cwd: '/tmp',
-        },
-      })
-    })
-
-    it('should use custom system prompt', async () => {
-      mockSDK.query = mock(async function* () {
-        yield { type: 'result', subtype: 'success', result: 'Custom prompt response' }
-      })
-
-      const response = await Effect.runPromise(
-        claudeSDKStrategy.executeReview('Test prompt', {
-          systemPrompt: 'Custom review prompt',
-        }),
-      )
-
-      expect(response).toBe('Custom prompt response')
-      expect(mockSDK.query).toHaveBeenCalledWith({
-        prompt: 'Test prompt',
-        options: {
-          maxTurns: 3,
-          customSystemPrompt: 'Custom review prompt',
-          allowedTools: ['Read', 'Grep', 'Glob'],
-          cwd: undefined,
-        },
-      })
-    })
-
-    it('should handle SDK failure', async () => {
-      mockSDK.query = mock(async function* () {
-        throw new Error('SDK error')
-      })
-
-      try {
-        await Effect.runPromise(claudeSDKStrategy.executeReview('Test prompt'))
-        expect(false).toBe(true) // Should not reach here
-      } catch (error: any) {
-        expect(error.message).toContain('Claude SDK failed')
-      }
-    })
-
-    it('should handle no result received', async () => {
-      mockSDK.query = mock(async function* () {
-        yield { type: 'message', content: 'No result' }
-      })
-
-      try {
-        await Effect.runPromise(claudeSDKStrategy.executeReview('Test prompt'))
-        expect(false).toBe(true) // Should not reach here
-      } catch (error: any) {
-        expect(error.message).toContain('No result received')
-      }
+      expect(response).toBe('OpenCode tagged content')
     })
   })
 
