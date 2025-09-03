@@ -89,7 +89,7 @@ interface ReviewOptions {
   comment?: boolean
   yes?: boolean
   prompt?: string
-  provider?: string
+  tool?: string
   systemPrompt?: string
 }
 
@@ -336,7 +336,7 @@ export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
     }
 
     // Select strategy based on user preference
-    const selectedStrategy = yield* reviewStrategy.selectStrategy(options.provider)
+    const selectedStrategy = yield* reviewStrategy.selectStrategy(options.tool)
     yield* Console.log(`✓ Using AI tool: ${selectedStrategy.name}`)
 
     // Load custom review prompt if provided
