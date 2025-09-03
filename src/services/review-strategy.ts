@@ -5,6 +5,13 @@ import { promisify } from 'node:util'
 
 const execAsync = promisify(exec)
 
+// Dynamic import for Claude SDK
+const getClaudeSDK = () =>
+  Effect.tryPromise({
+    try: () => import('@anthropic-ai/claude-code'),
+    catch: () => null,
+  }).pipe(Effect.orElseSucceed(() => null))
+
 // Simple strategy focused only on review needs
 export class ReviewStrategyError extends Data.TaggedError('ReviewStrategyError')<{
   message: string
@@ -226,6 +233,62 @@ export const codexCliStrategy: ReviewStrategy = {
     }),
 }
 
+export const claudeSDKStrategy: ReviewStrategy = {
+  name: 'Claude SDK',
+  isAvailable: () =>
+    Effect.gen(function* () {
+      const sdk = yield* getClaudeSDK()
+
+      // Check if we have ANTHROPIC_API_KEY
+      const hasApiKey = Boolean(process.env.ANTHROPIC_API_KEY)
+
+      return Boolean(sdk && hasApiKey)
+    }),
+  executeReview: (prompt, options = {}) =>
+    Effect.gen(function* () {
+      const sdk = yield* getClaudeSDK()
+
+      if (!sdk) {
+        return yield* Effect.fail(
+          new ReviewStrategyError({
+            message: 'Claude SDK not available',
+          }),
+        )
+      }
+
+      const result = yield* Effect.tryPromise({
+        try: async () => {
+          const messages = []
+
+          for await (const message of sdk.query({
+            prompt,
+            options: {
+              maxTurns: 3,
+              customSystemPrompt:
+                options.systemPrompt ||
+                'You are a code review expert. Analyze code changes and provide constructive feedback.',
+              allowedTools: ['Read', 'Grep', 'Glob'],
+              cwd: options.cwd,
+            },
+          })) {
+            if (message.type === 'result' && message.subtype === 'success') {
+              return message.result
+            }
+          }
+
+          throw new Error('No result received from Claude SDK')
+        },
+        catch: (error) =>
+          new ReviewStrategyError({
+            message: `Claude SDK failed: ${error instanceof Error ? error.message : String(error)}`,
+            cause: error,
+          }),
+      })
+
+      return result
+    }),
+}
+
 // Review service using strategy pattern
 export class ReviewStrategyService extends Context.Tag('ReviewStrategyService')<
   ReviewStrategyService,
@@ -248,6 +311,7 @@ export const ReviewStrategyServiceLive = Layer.succeed(
     getAvailableStrategies: () =>
       Effect.gen(function* () {
         const strategies = [
+          claudeSDKStrategy,
           claudeCliStrategy,
           geminiCliStrategy,
           openCodeCliStrategy,
@@ -268,6 +332,7 @@ export const ReviewStrategyServiceLive = Layer.succeed(
     selectStrategy: (preferredName?: string) =>
       Effect.gen(function* () {
         const strategies = [
+          claudeSDKStrategy,
           claudeCliStrategy,
           geminiCliStrategy,
           openCodeCliStrategy,

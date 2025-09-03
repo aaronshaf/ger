@@ -29,6 +29,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.102",
     "@effect/platform": "^0.90.6",
     "@effect/platform-node": "^0.94.2",
     "@effect/schema": "^0.75.5",
