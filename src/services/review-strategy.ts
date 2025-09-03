@@ -1,5 +1,4 @@
 import { Context, Data, Effect, Layer } from 'effect'
-import { Console } from 'effect'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
 
@@ -198,34 +197,6 @@ export const openCodeCliStrategy: ReviewStrategy = {
     }),
 }
 
-export const codexCliStrategy: ReviewStrategy = {
-  name: 'Codex CLI',
-  isAvailable: () =>
-    Effect.gen(function* () {
-      const result = yield* Effect.tryPromise({
-        try: () => execAsync('which codex'),
-        catch: () => null,
-      }).pipe(Effect.orElseSucceed(() => null))
-
-      return Boolean(result && result.stdout.trim())
-    }),
-  executeReview: (prompt, options = {}) =>
-    Effect.gen(function* () {
-      const command = `codex exec "${prompt.replace(/"/g, '\\"')}"`
-
-      const result = yield* Effect.tryPromise({
-        try: () => execAsync(command, { cwd: options.cwd }),
-        catch: (error) =>
-          new ReviewStrategyError({
-            message: `Codex CLI failed: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
-      })
-
-      return result.stdout.trim()
-    }),
-}
-
 // Review service using strategy pattern
 export class ReviewStrategyService extends Context.Tag('ReviewStrategyService')<
   ReviewStrategyService,
@@ -247,12 +218,7 @@ export const ReviewStrategyServiceLive = Layer.succeed(
   ReviewStrategyService.of({
     getAvailableStrategies: () =>
       Effect.gen(function* () {
-        const strategies = [
-          claudeCliStrategy,
-          geminiCliStrategy,
-          openCodeCliStrategy,
-          codexCliStrategy,
-        ]
+        const strategies = [claudeCliStrategy, geminiCliStrategy, openCodeCliStrategy]
         const available: ReviewStrategy[] = []
 
         for (const strategy of strategies) {
@@ -267,12 +233,7 @@ export const ReviewStrategyServiceLive = Layer.succeed(
 
     selectStrategy: (preferredName?: string) =>
       Effect.gen(function* () {
-        const strategies = [
-          claudeCliStrategy,
-          geminiCliStrategy,
-          openCodeCliStrategy,
-          codexCliStrategy,
-        ]
+        const strategies = [claudeCliStrategy, geminiCliStrategy, openCodeCliStrategy]
         const available: ReviewStrategy[] = []
 
         for (const strategy of strategies) {
@@ -285,7 +246,7 @@ export const ReviewStrategyServiceLive = Layer.succeed(
         if (available.length === 0) {
           return yield* Effect.fail(
             new ReviewStrategyError({
-              message: 'No AI tools available. Please install claude, gemini, or codex CLI.',
+              message: 'No AI tools available. Please install claude, gemini, or opencode CLI.',
             }),
           )
         }
