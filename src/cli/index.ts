@@ -25,7 +25,7 @@ import { Command } from 'commander'
 import { Effect } from 'effect'
 import { GerritApiServiceLive } from '@/api/gerrit'
 import { ConfigServiceLive } from '@/services/config'
-import { AiServiceLive } from '@/services/ai-enhanced'
+import { ReviewStrategyServiceLive } from '@/services/review-strategy'
 import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { abandonCommand } from './commands/abandon'
 import { commentCommand } from './commands/comment'
@@ -368,6 +368,8 @@ program
   .option('-y, --yes', 'Skip confirmation prompts when posting comments')
   .option('--debug', 'Show debug output including AI responses')
   .option('--prompt <file>', 'Path to custom review prompt file (e.g., ~/prompts/review.md)')
+  .option('--provider <provider>', 'Preferred AI provider (claude, gemini, codex, llm)')
+  .option('--system-prompt <prompt>', 'Custom system prompt for the AI')
   .addHelpText(
     'after',
     `
@@ -406,8 +408,10 @@ Examples:
         yes: options.yes,
         debug: options.debug,
         prompt: options.prompt,
+        provider: options.provider,
+        systemPrompt: options.systemPrompt,
       }).pipe(
-        Effect.provide(AiServiceLive),
+        Effect.provide(ReviewStrategyServiceLive),
         Effect.provide(GerritApiServiceLive),
         Effect.provide(ConfigServiceLive),
         Effect.provide(GitWorktreeServiceLive),
