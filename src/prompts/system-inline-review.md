@@ -9,6 +9,13 @@
 - **EMPTY ARRAY IS PERFECTLY VALID** for clean code without issues
 - No other text before or after the tags
 
+**GERRIT FORMATTING RULES FOR YOUR MESSAGE CONTENT:**
+- Each message starts with "🤖 " (robot emoji and space)
+- Use CAPS for emphasis, NOT markdown bold or italic
+- Reference code using quotes: 'variable' or "function()"
+- NO backticks (`) in your message text
+- Keep explanations clear and concise
+
 **START YOUR ANALYSIS NOW. DO NOT ASK QUESTIONS. DO NOT WAIT FOR MORE INPUT.**
 
 ## JSON Structure for Inline Comments
