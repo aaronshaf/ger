@@ -66,14 +66,54 @@ const verifyCredentials = (credentials: GerritCredentials) =>
     },
     catch: (error) => {
       if (error instanceof Error) {
+        // Authentication/permission errors
         if (error.message.includes('401')) {
           return new ConfigError({
             message: 'Invalid credentials. Please check your username and password.',
           })
         }
-        if (error.message.includes('ENOTFOUND')) {
-          return new ConfigError({ message: 'Could not connect to Gerrit. Please check the URL.' })
+        if (error.message.includes('403')) {
+          return new ConfigError({
+            message: 'Access denied. Please verify your credentials and server permissions.',
+          })
         }
+
+        // Network/hostname errors
+        if (error.message.includes('ENOTFOUND')) {
+          return new ConfigError({
+            message: `Hostname not found. Please check that the Gerrit URL is correct.\nExample: https://gerrit.example.com (without /a/ or paths)`,
+          })
+        }
+        if (error.message.includes('ECONNREFUSED')) {
+          return new ConfigError({
+            message: `Connection refused. The server may be down or the port may be incorrect.\nPlease verify the URL and try again.`,
+          })
+        }
+        if (error.message.includes('ETIMEDOUT')) {
+          return new ConfigError({
+            message: `Connection timed out. Please check:\n• Your internet connection\n• The Gerrit server URL\n• Any firewall or VPN settings`,
+          })
+        }
+        if (error.message.includes('certificate') || error.message.includes('SSL')) {
+          return new ConfigError({
+            message: `SSL/Certificate error. Please ensure the URL uses HTTPS and the certificate is valid.`,
+          })
+        }
+
+        // URL format errors
+        if (error.message.includes('Invalid URL') || error.message.includes('fetch failed')) {
+          return new ConfigError({
+            message: `Invalid URL format. Please use the full URL including https://\nExample: https://gerrit.example.com`,
+          })
+        }
+
+        // Generic network errors
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          return new ConfigError({
+            message: `Network error: ${error.message}\nPlease check your connection and the Gerrit server URL.`,
+          })
+        }
+
         return new ConfigError({ message: error.message })
       }
       return new ConfigError({ message: 'Unknown error occurred' })
@@ -223,11 +263,8 @@ const setupEffect = (configService: ConfigServiceImpl) =>
     Effect.catchAll((error) =>
       pipe(
         Console.error(
-          chalk.red(
-            `\nAuthentication failed: ${error instanceof ConfigError ? error.message : 'Unknown error'}`,
-          ),
+          chalk.red(`\n${error instanceof ConfigError ? error.message : `Setup failed: ${error}`}`),
         ),
-        Effect.flatMap(() => Console.error('Please check your credentials and try again.')),
         Effect.flatMap(() => Effect.fail(error)),
       ),
     ),
