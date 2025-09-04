@@ -1,14 +1,12 @@
 # ger
 
-Gerrit CLI built with Bun. XML output by default for LLM/automation compatibility, human-readable output with `--pretty`.
+Gerrit CLI built with Bun.
 
 ## Features
 
 - **LLM-Friendly**: XML output for AI/automation pipelines
-- **Interactive UI**: Terminal UI for change selection and navigation  
-- **Secure**: Credentials stored in system keychain
+- **Interactive UI**: Terminal UI for change selection and navigation
 - **Effect-based**: Robust error handling and functional architecture
-- **Batch Comments**: JSON array input with line/range targeting and side support
 
 ## Installation
 
@@ -30,8 +28,6 @@ This will prompt for your Gerrit credentials:
 - Gerrit host URL
 - Username
 - HTTP password (from Gerrit settings)
-
-Credentials are securely stored in your system keychain.
 
 ## Common Commands
 
