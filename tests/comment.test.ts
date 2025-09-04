@@ -556,7 +556,8 @@ describe('comment command', () => {
 
     const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
     expect(output).toContain('✓ Comment posted successfully!')
-    expect(output).toContain('Message: Piped comment message')
+    // Note: The message content is no longer displayed after successful posting
+    // to avoid duplication with the review preview section
 
     // Restore process.stdin
     Object.defineProperty(process, 'stdin', {

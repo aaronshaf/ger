@@ -443,9 +443,9 @@ const formatHumanOutput = (
       console.log(`File: ${options.file}, Line: ${options.line}`)
       console.log(`Message: ${options.message}`)
       if (options.unresolved) console.log(`Status: Unresolved`)
-    } else {
-      console.log(`Message: ${review.message}`)
     }
+    // Note: For overall review messages, we don't display the content here
+    // since it was already shown in the "OVERALL REVIEW TO POST" section
   })
 
 // Main output formatter
