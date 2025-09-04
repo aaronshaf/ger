@@ -112,64 +112,77 @@ const setupEffect = (configService: ConfigServiceImpl) =>
             try: async () => {
               console.log('')
 
-              // Gerrit Host URL
-              const host = await input({
-                message: 'Gerrit Host URL (e.g., https://gerrit.example.com)',
-                default: existingConfig?.host,
-              })
-
-              // Username
-              const username = await input({
-                message: 'Username (your Gerrit username)',
-                default: existingConfig?.username,
-              })
-
-              // Password - similar to ji's pattern
-              const passwordValue =
-                (await password({
-                  message: 'HTTP Password (generated from Gerrit settings)',
-                })) ||
-                existingConfig?.password ||
-                ''
-
-              console.log('')
-              console.log(chalk.yellow('Optional: AI Configuration'))
-
-              // Show detected AI tools
-              if (availableTools.length > 0) {
-                console.log(chalk.dim(`Detected AI tools: ${availableTools.join(', ')}`))
+              // Enable raw mode for proper password masking
+              const wasRawMode = process.stdin.isRaw
+              if (process.stdin.isTTY && !wasRawMode) {
+                process.stdin.setRawMode(true)
               }
 
-              // Get default suggestion
-              const defaultCommand =
-                existingConfig?.aiTool ||
-                (availableTools.includes('claude') ? 'claude' : availableTools[0]) ||
-                ''
+              try {
+                // Gerrit Host URL
+                const host = await input({
+                  message: 'Gerrit Host URL (e.g., https://gerrit.example.com)',
+                  default: existingConfig?.host,
+                })
 
-              // AI tool command with smart default
-              const aiToolCommand = await input({
-                message:
-                  availableTools.length > 0
-                    ? 'AI tool command (detected from system)'
-                    : 'AI tool command (e.g., claude, llm, opencode, gemini)',
-                default: defaultCommand || 'claude',
-              })
+                // Username
+                const username = await input({
+                  message: 'Username (your Gerrit username)',
+                  default: existingConfig?.username,
+                })
 
-              // Build flat config
-              const configData = {
-                host: host.trim().replace(/\/$/, ''), // Remove trailing slash
-                username: username.trim(),
-                password: passwordValue,
-                ...(aiToolCommand && {
-                  aiTool: aiToolCommand,
-                }),
-                aiAutoDetect: !aiToolCommand,
+                // Password - with proper masking
+                const passwordValue =
+                  (await password({
+                    message: 'HTTP Password (generated from Gerrit settings) [input is masked]',
+                  })) ||
+                  existingConfig?.password ||
+                  ''
+
+                console.log('')
+                console.log(chalk.yellow('Optional: AI Configuration'))
+
+                // Show detected AI tools
+                if (availableTools.length > 0) {
+                  console.log(chalk.dim(`Detected AI tools: ${availableTools.join(', ')}`))
+                }
+
+                // Get default suggestion
+                const defaultCommand =
+                  existingConfig?.aiTool ||
+                  (availableTools.includes('claude') ? 'claude' : availableTools[0]) ||
+                  ''
+
+                // AI tool command with smart default
+                const aiToolCommand = await input({
+                  message:
+                    availableTools.length > 0
+                      ? 'AI tool command (detected from system)'
+                      : 'AI tool command (e.g., claude, llm, opencode, gemini)',
+                  default: defaultCommand || 'claude',
+                })
+
+                // Build flat config
+                const configData = {
+                  host: host.trim().replace(/\/$/, ''), // Remove trailing slash
+                  username: username.trim(),
+                  password: passwordValue,
+                  ...(aiToolCommand && {
+                    aiTool: aiToolCommand,
+                  }),
+                  aiAutoDetect: !aiToolCommand,
+                }
+
+                // Validate config using Schema instead of type assertion
+                const fullConfig = Schema.decodeUnknownSync(AppConfig)(configData)
+
+                return fullConfig
+              } finally {
+                // Restore raw mode state
+                if (process.stdin.isTTY && !wasRawMode) {
+                  process.stdin.setRawMode(false)
+                }
               }
-
-              // Validate config using Schema instead of type assertion
-              const fullConfig = Schema.decodeUnknownSync(AppConfig)(configData)
-
-              return fullConfig
             },
             catch: (error) => {
               if (error instanceof Error && error.message.includes('User force closed')) {
