@@ -131,10 +131,11 @@ const setupEffect = (configService: ConfigServiceImpl) =>
                   default: existingConfig?.username,
                 })
 
-                // Password - with proper masking
+                // Password - with proper masking and visual feedback
                 const passwordValue =
                   (await password({
-                    message: 'HTTP Password (generated from Gerrit settings) [input is masked]',
+                    message: 'HTTP Password (generated from Gerrit settings)',
+                    mask: true, // Show * characters as user types
                   })) ||
                   existingConfig?.password ||
                   ''
