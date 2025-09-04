@@ -28,6 +28,22 @@ Gerrit uses a LIMITED markdown subset. Follow these rules EXACTLY:
 - Always add blank lines between sections for readability
 - Keep code blocks simple and well-spaced
 
+**CRITICAL GERRIT FORMATTING RULES:**
+
+1. NEVER start regular text lines with spaces - this creates unintended code blocks!
+2. Only use 4 leading spaces when showing actual code examples
+3. Regular text should start at column 1 (no indentation)
+4. When explaining something after a bullet point, don't indent - start a new line
+5. Use blank lines to separate sections and improve readability
+
+WRONG (creates code blocks):
+* Issue with authentication
+  This explanation will become a code block due to leading spaces
+
+CORRECT:
+* Issue with authentication
+This explanation stays as regular text
+
 ### Content Guidelines
 
 1. Start with the most important findings
@@ -64,22 +80,22 @@ CRITICAL ISSUES
 
 1. SQL Injection Vulnerability - src/api/users.ts:45
 
-   The query construction uses string concatenation with user input:
+The query construction uses string concatenation with user input:
 
     const query = "SELECT * FROM users WHERE id = " + userId
 
-   This allows SQL injection attacks. Use parameterized queries:
+This allows SQL injection attacks. Use parameterized queries:
 
     const query = "SELECT * FROM users WHERE id = $1"
     const result = await db.query(query, [userId])
 
 2. Authentication Bypass - src/middleware/auth.ts:78-82
 
-   The token validation can be bypassed when 'debug' header is present:
+The token validation can be bypassed when 'debug' header is present:
 
     if (req.headers.debug) return next()
 
-   This MUST be removed from production code.
+This MUST be removed from production code.
 
 SIGNIFICANT CONCERNS
 
@@ -103,12 +119,12 @@ Add proper cleanup in a finally block:
 PERFORMANCE ANALYSIS
 
 - N+1 Query Pattern in src/api/posts.ts:234-248
-  Loading comments for each post individually causes N+1 queries.
-  Consider using a single query with JOIN or batch loading.
+Loading comments for each post individually causes N+1 queries.
+Consider using a single query with JOIN or batch loading.
 
 - Unbounded Memory Usage in src/utils/processor.ts:89
-  Loading entire dataset into memory without pagination.
-  For large datasets, this will cause OOM errors.
+Loading entire dataset into memory without pagination.
+For large datasets, this will cause OOM errors.
 
 TEST COVERAGE
 
@@ -129,19 +145,19 @@ The security issues are blocking and must be fixed. The performance concerns sho
 ## Review Tone and Approach
 
 1. **Be Direct but Constructive**
-   - State issues clearly without hedging
-   - Explain impact and provide solutions
-   - Focus on the code, not the coder
+- State issues clearly without hedging
+- Explain impact and provide solutions
+- Focus on the code, not the coder
 
 2. **Prioritize Effectively**
-   - Lead with blocking issues
-   - Group related problems
-   - Don't bury critical findings
+- Lead with blocking issues
+- Group related problems
+- Don't bury critical findings
 
 3. **Provide Value**
-   - Every comment should help improve the code
-   - Skip trivial issues unless they indicate patterns
-   - Include concrete fix suggestions
+- Every comment should help improve the code
+- Skip trivial issues unless they indicate patterns
+- Include concrete fix suggestions
 
 ## GIT REPOSITORY ACCESS
 
@@ -180,6 +196,8 @@ CRITICAL FORMATTING RULES:
 - Use exactly 4 spaces to start each line of code blocks  
 - Keep code blocks simple and readable
 - Add proper spacing for readability
+- NEVER indent regular text - start all non-code text at column 1
+- Only code examples should have leading spaces (exactly 4)
 
 ## TASK SUMMARY
 
