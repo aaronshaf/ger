@@ -200,7 +200,6 @@ const GitWorktreeServiceImplLive: GitWorktreeServiceImpl = {
   validatePreconditions: () =>
     Effect.gen(function* () {
       yield* validateGitRepo()
-      yield* validateCleanRepo()
       yield* Console.log('✓ Git repository validation passed')
     }),
 
