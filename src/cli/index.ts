@@ -23,6 +23,9 @@ if (compareSemver(bunVersion, MIN_BUN_VERSION) < 0) {
 
 import { Command } from 'commander'
 import { Effect } from 'effect'
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { GerritApiServiceLive } from '@/api/gerrit'
 import { ConfigServiceLive } from '@/services/config'
 import { ReviewStrategyServiceLive } from '@/services/review-strategy'
@@ -40,9 +43,26 @@ import { showCommand } from './commands/show'
 import { statusCommand } from './commands/status'
 import { workspaceCommand } from './commands/workspace'
 
+// Read version from package.json
+function getVersion(): string {
+  try {
+    // Get the directory of the current module
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = dirname(__filename)
+
+    // Navigate up to the project root and read package.json
+    const packageJsonPath = join(__dirname, '..', '..', 'package.json')
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8'))
+    return packageJson.version || '0.0.0'
+  } catch (error) {
+    // Fallback version if package.json can't be read
+    return '0.0.0'
+  }
+}
+
 const program = new Command()
 
-program.name('gi').description('LLM-centric Gerrit CLI tool').version('0.1.0')
+program.name('gi').description('LLM-centric Gerrit CLI tool').version(getVersion())
 
 // setup command (new primary command)
 program
