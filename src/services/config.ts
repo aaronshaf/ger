@@ -29,6 +29,21 @@ export class ConfigError extends Schema.TaggedError<ConfigError>()('ConfigError'
 const CONFIG_DIR = path.join(os.homedir(), '.ger')
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json')
 
+const readEnvConfig = (): unknown | null => {
+  const { GERRIT_HOST, GERRIT_USERNAME, GERRIT_PASSWORD } = process.env
+
+  if (GERRIT_HOST && GERRIT_USERNAME && GERRIT_PASSWORD) {
+    return {
+      host: GERRIT_HOST,
+      username: GERRIT_USERNAME,
+      password: GERRIT_PASSWORD,
+      aiAutoDetect: true,
+    }
+  }
+
+  return null
+}
+
 const readFileConfig = (): unknown | null => {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -85,21 +100,34 @@ export const ConfigServiceLive: Layer.Layer<ConfigService, never, never> = Layer
   ConfigService,
   Effect.sync(() => {
     const getFullConfig = Effect.gen(function* () {
+      // First try to read from file
       const fileContent = readFileConfig()
-      if (!fileContent) {
-        return yield* Effect.fail(
-          new ConfigError({
-            message: 'Configuration not found. Run "ger setup" to set up your credentials.',
-          }),
+      if (fileContent) {
+        // Parse as flat config
+        const fullConfigResult = yield* Schema.decodeUnknown(AppConfig)(fileContent).pipe(
+          Effect.mapError(() => new ConfigError({ message: 'Invalid configuration format' })),
         )
+        return fullConfigResult
       }
 
-      // Parse as flat config
-      const fullConfigResult = yield* Schema.decodeUnknown(AppConfig)(fileContent).pipe(
-        Effect.mapError(() => new ConfigError({ message: 'Invalid configuration format' })),
-      )
+      // Fallback to environment variables
+      const envContent = readEnvConfig()
+      if (envContent) {
+        const fullConfigResult = yield* Schema.decodeUnknown(AppConfig)(envContent).pipe(
+          Effect.mapError(
+            () => new ConfigError({ message: 'Invalid environment configuration format' }),
+          ),
+        )
+        return fullConfigResult
+      }
 
-      return fullConfigResult
+      // No configuration found
+      return yield* Effect.fail(
+        new ConfigError({
+          message:
+            'Configuration not found. Run "ger setup" to set up your credentials or set GERRIT_HOST, GERRIT_USERNAME, and GERRIT_PASSWORD environment variables.',
+        }),
+      )
     })
 
     const saveFullConfig = (config: AppConfig) =>
