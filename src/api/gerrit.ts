@@ -52,15 +52,32 @@ export interface GerritApiServiceImpl {
   readonly getMessages: (changeId: string) => Effect.Effect<readonly MessageInfo[], ApiError>
 }
 
-export class GerritApiService extends Context.Tag('GerritApiService')<
-  GerritApiService,
-  GerritApiServiceImpl
->() {}
+// Export both the tag value and the type for use in Effect requirements
+export const GerritApiService: Context.Tag<GerritApiServiceImpl, GerritApiServiceImpl> =
+  Context.GenericTag<GerritApiServiceImpl>('GerritApiService')
+export type GerritApiService = Context.Tag.Identifier<typeof GerritApiService>
 
-export class ApiError extends Schema.TaggedError<ApiError>()('ApiError', {
+// Export ApiError fields interface explicitly
+export interface ApiErrorFields {
+  readonly message: string
+  readonly status?: number
+}
+
+// Define error schema (not exported, so type can be implicit)
+const ApiErrorSchema = Schema.TaggedError<ApiErrorFields>()('ApiError', {
   message: Schema.String,
   status: Schema.optional(Schema.Number),
-} as const) {}
+} as const) as unknown
+
+// Export the error class with explicit constructor signature for isolatedDeclarations
+export class ApiError
+  extends (ApiErrorSchema as new (
+    args: ApiErrorFields,
+  ) => ApiErrorFields & Error & { readonly _tag: 'ApiError' })
+  implements Error
+{
+  readonly name = 'ApiError'
+}
 
 const createAuthHeader = (credentials: GerritCredentials): string => {
   const auth = btoa(`${credentials.username}:${credentials.password}`)

@@ -16,14 +16,30 @@ export interface ConfigServiceImpl {
   readonly saveFullConfig: (config: AppConfig) => Effect.Effect<void, ConfigError>
 }
 
-export class ConfigService extends Context.Tag('ConfigService')<
-  ConfigService,
-  ConfigServiceImpl
->() {}
+// Export both the tag value and the type for use in Effect requirements
+export const ConfigService: Context.Tag<ConfigServiceImpl, ConfigServiceImpl> =
+  Context.GenericTag<ConfigServiceImpl>('ConfigService')
+export type ConfigService = Context.Tag.Identifier<typeof ConfigService>
 
-export class ConfigError extends Schema.TaggedError<ConfigError>()('ConfigError', {
+// Export ConfigError fields interface explicitly
+export interface ConfigErrorFields {
+  readonly message: string
+}
+
+// Define error schema (not exported, so type can be implicit)
+const ConfigErrorSchema = Schema.TaggedError<ConfigErrorFields>()('ConfigError', {
   message: Schema.String,
-} as const) {}
+} as const) as unknown
+
+// Export the error class with explicit constructor signature for isolatedDeclarations
+export class ConfigError
+  extends (ConfigErrorSchema as new (
+    args: ConfigErrorFields,
+  ) => ConfigErrorFields & Error & { readonly _tag: 'ConfigError' })
+  implements Error
+{
+  readonly name = 'ConfigError'
+}
 
 // File-based storage
 const CONFIG_DIR = path.join(os.homedir(), '.ger')

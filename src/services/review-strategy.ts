@@ -12,10 +12,23 @@ const extractResponse = (stdout: string): string => {
 }
 
 // Simple strategy focused only on review needs
-export class ReviewStrategyError extends Data.TaggedError('ReviewStrategyError')<{
-  message: string
-  cause?: unknown
-}> {}
+export interface ReviewStrategyErrorFields {
+  readonly message: string
+  readonly cause?: unknown
+}
+
+const ReviewStrategyErrorBase = Data.TaggedError(
+  'ReviewStrategyError',
+)<ReviewStrategyErrorFields> as unknown
+
+export class ReviewStrategyError
+  extends (ReviewStrategyErrorBase as new (
+    args: ReviewStrategyErrorFields,
+  ) => ReviewStrategyErrorFields & Error & { readonly _tag: 'ReviewStrategyError' })
+  implements Error
+{
+  readonly name = 'ReviewStrategyError'
+}
 
 // Review strategy interface - focused on specific review patterns
 export interface ReviewStrategy {
@@ -202,25 +215,30 @@ export const openCodeCliStrategy: ReviewStrategy = {
     }),
 }
 
-// Review service using strategy pattern
-export class ReviewStrategyService extends Context.Tag('ReviewStrategyService')<
+// Review service interface using strategy pattern
+export interface ReviewStrategyServiceImpl {
+  readonly getAvailableStrategies: () => Effect.Effect<ReviewStrategy[], never>
+  readonly selectStrategy: (
+    preferredName?: string,
+  ) => Effect.Effect<ReviewStrategy, ReviewStrategyError>
+  readonly executeWithStrategy: (
+    strategy: ReviewStrategy,
+    prompt: string,
+    options?: { cwd?: string; systemPrompt?: string },
+  ) => Effect.Effect<string, ReviewStrategyError>
+}
+
+// Export the service tag with explicit type
+export const ReviewStrategyService: Context.Tag<
+  ReviewStrategyServiceImpl,
+  ReviewStrategyServiceImpl
+> = Context.GenericTag<ReviewStrategyServiceImpl>('ReviewStrategyService')
+
+export type ReviewStrategyService = Context.Tag.Identifier<typeof ReviewStrategyService>
+
+export const ReviewStrategyServiceLive: Layer.Layer<ReviewStrategyServiceImpl> = Layer.succeed(
   ReviewStrategyService,
   {
-    readonly getAvailableStrategies: () => Effect.Effect<ReviewStrategy[], never>
-    readonly selectStrategy: (
-      preferredName?: string,
-    ) => Effect.Effect<ReviewStrategy, ReviewStrategyError>
-    readonly executeWithStrategy: (
-      strategy: ReviewStrategy,
-      prompt: string,
-      options?: { cwd?: string; systemPrompt?: string },
-    ) => Effect.Effect<string, ReviewStrategyError>
-  }
->() {}
-
-export const ReviewStrategyServiceLive = Layer.succeed(
-  ReviewStrategyService,
-  ReviewStrategyService.of({
     getAvailableStrategies: () =>
       Effect.gen(function* () {
         const strategies = [claudeCliStrategy, geminiCliStrategy, openCodeCliStrategy]
@@ -270,5 +288,5 @@ export const ReviewStrategyServiceLive = Layer.succeed(
 
     executeWithStrategy: (strategy, prompt, options = {}) =>
       strategy.executeReview(prompt, options),
-  }),
+  },
 )

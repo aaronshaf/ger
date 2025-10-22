@@ -18,7 +18,8 @@
     "types": [
       "bun-types"
     ],
-    "isolatedDeclarations": false,
+    "declaration": true,
+    "isolatedDeclarations": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
