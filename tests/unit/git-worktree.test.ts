@@ -21,7 +21,8 @@ describe('GitWorktreeService Types and Structure', () => {
 
   test('should create service tag correctly', () => {
     expect(GitWorktreeService).toBeDefined()
-    expect(typeof GitWorktreeService).toBe('function')
+    expect(typeof GitWorktreeService).toBe('object')
+    expect(GitWorktreeService.key).toBe('GitWorktreeService')
   })
 
   test('should be able to create mock service implementation', async () => {

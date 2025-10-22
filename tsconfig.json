@@ -18,7 +18,7 @@
     "types": [
       "bun-types"
     ],
-    "isolatedDeclarations": false, // Cannot enable: Effect v3 uses dynamic type expressions in Context.Tag/Schema.TaggedError incompatible with this feature
+    "isolatedDeclarations": false, // Partial progress: Service tags work, TaggedErrors need more work (see commit a0161da)
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,

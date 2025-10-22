@@ -52,11 +52,18 @@ export interface GerritApiServiceImpl {
   readonly getMessages: (changeId: string) => Effect.Effect<readonly MessageInfo[], ApiError>
 }
 
-export class GerritApiService extends Context.Tag('GerritApiService')<
-  GerritApiService,
-  GerritApiServiceImpl
->() {}
+// Export both the tag value and the type for use in Effect requirements
+export const GerritApiService: Context.Tag<GerritApiServiceImpl, GerritApiServiceImpl> =
+  Context.GenericTag<GerritApiServiceImpl>('GerritApiService')
+export type GerritApiService = Context.Tag.Identifier<typeof GerritApiService>
 
+// Export ApiError fields interface explicitly
+export interface ApiErrorFields {
+  readonly message: string
+  readonly status?: number
+}
+
+// Export the error class with explicit type
 export class ApiError extends Schema.TaggedError<ApiError>()('ApiError', {
   message: Schema.String,
   status: Schema.optional(Schema.Number),

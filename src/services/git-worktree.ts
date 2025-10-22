@@ -286,11 +286,12 @@ const GitWorktreeServiceImplLive: GitWorktreeServiceImpl = {
     }),
 }
 
-// Export service tag for dependency injection
-export class GitWorktreeService extends Context.Tag('GitWorktreeService')<
-  GitWorktreeService,
-  GitWorktreeServiceImpl
->() {}
+// Export service tag for dependency injection with explicit type
+export const GitWorktreeService: Context.Tag<GitWorktreeServiceImpl, GitWorktreeServiceImpl> =
+  Context.GenericTag<GitWorktreeServiceImpl>('GitWorktreeService')
 
-// Export service layer
-export const GitWorktreeServiceLive = Layer.succeed(GitWorktreeService, GitWorktreeServiceImplLive)
+// Export service layer with explicit type
+export const GitWorktreeServiceLive: Layer.Layer<GitWorktreeServiceImpl> = Layer.succeed(
+  GitWorktreeService,
+  GitWorktreeServiceImplLive,
+)
