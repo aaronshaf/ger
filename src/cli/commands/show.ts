@@ -384,7 +384,7 @@ export const showCommand = (
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<show_result>`)
         console.log(`  <status>error</status>`)
-        console.log(`  <error><![CDATA[${errorMessage}]]></error>`)
+        console.log(`  <error><![CDATA[${sanitizeCDATA(errorMessage)}]]></error>`)
         console.log(`</show_result>`)
       } else {
         console.error(`✗ Error: ${errorMessage}`)
