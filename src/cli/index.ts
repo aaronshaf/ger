@@ -101,7 +101,7 @@ program
 // comment command
 program
   .command('comment <change-id>')
-  .description('Post a comment on a change')
+  .description('Post a comment on a change (accepts change number or Change-ID)')
   .option('-m, --message <message>', 'Comment message')
   .option('--file <file>', 'File path for line-specific comment (relative to repo root)')
   .option(
@@ -116,8 +116,11 @@ program
     'after',
     `
 Examples:
-  # Post a general comment on a change
+  # Post a general comment on a change (using change number)
   $ ger comment 12345 -m "Looks good to me!"
+
+  # Post a comment using Change-ID
+  $ ger comment If5a3ae8cb5a107e187447802358417f311d0c4b1 -m "LGTM"
 
   # Post a comment using piped input (useful for multi-line comments or scripts)
   $ echo "This is a comment from stdin!" | ger comment 12345
@@ -135,9 +138,11 @@ Examples:
       {"file": "src/api.js", "line": 25, "message": "Check error handling", "unresolved": true}
     ]}' | ger comment 12345 --batch
 
-Note: Line numbers refer to the actual line numbers in the NEW version of the file,
-      NOT the line numbers shown in the diff view. To find the correct line number,
-      look at the file after all changes have been applied.`,
+Note:
+  - Both change number (e.g., 12345) and Change-ID (e.g., If5a3ae8...) formats are accepted
+  - Line numbers refer to the actual line numbers in the NEW version of the file,
+    NOT the line numbers shown in the diff view. To find the correct line number,
+    look at the file after all changes have been applied.`,
   )
   .action(async (changeId, options) => {
     try {
@@ -165,7 +170,7 @@ Note: Line numbers refer to the actual line numbers in the NEW version of the fi
 // diff command
 program
   .command('diff <change-id>')
-  .description('Get diff for a change')
+  .description('Get diff for a change (accepts change number or Change-ID)')
   .option('--xml', 'XML output for LLM consumption')
   .option('--file <file>', 'Specific file to diff')
   .option('--files-only', 'List changed files only')
@@ -224,7 +229,9 @@ program
 // workspace command
 program
   .command('workspace <change-id>')
-  .description('Create or switch to a git worktree for a Gerrit change')
+  .description(
+    'Create or switch to a git worktree for a Gerrit change (accepts change number or Change-ID)',
+  )
   .option('--xml', 'XML output for LLM consumption')
   .action(async (changeId, options) => {
     try {
@@ -281,7 +288,9 @@ program
 // abandon command
 program
   .command('abandon [change-id]')
-  .description('Abandon a change (interactive mode if no change-id provided)')
+  .description(
+    'Abandon a change (interactive mode if no change-id provided; accepts change number or Change-ID)',
+  )
   .option('-m, --message <message>', 'Abandon message')
   .option('--xml', 'XML output for LLM consumption')
   .action(async (changeId, options) => {
@@ -310,7 +319,9 @@ program
 // comments command
 program
   .command('comments <change-id>')
-  .description('Show all comments on a change with diff context')
+  .description(
+    'Show all comments on a change with diff context (accepts change number or Change-ID)',
+  )
   .option('--xml', 'XML output for LLM consumption')
   .action(async (changeId, options) => {
     try {
@@ -338,7 +349,7 @@ program
 // open command
 program
   .command('open <change-id>')
-  .description('Open a change in the browser')
+  .description('Open a change in the browser (accepts change number or Change-ID)')
   .action(async (changeId, options) => {
     try {
       const effect = openCommand(changeId, options).pipe(
@@ -354,9 +365,29 @@ program
 
 // show command
 program
-  .command('show <change-id>')
-  .description('Show comprehensive change information including metadata, diff, and all comments')
+  .command('show [change-id]')
+  .description(
+    'Show comprehensive change information (auto-detects from HEAD commit if not specified)',
+  )
   .option('--xml', 'XML output for LLM consumption')
+  .addHelpText(
+    'after',
+    `
+Examples:
+  # Show specific change (using change number)
+  $ ger show 392385
+
+  # Show specific change (using Change-ID)
+  $ ger show If5a3ae8cb5a107e187447802358417f311d0c4b1
+
+  # Auto-detect Change-ID from HEAD commit
+  $ ger show
+  $ ger show --xml
+
+Note: When no change-id is provided, it will be automatically extracted from the
+      Change-ID footer in your HEAD commit. You must be in a git repository with
+      a commit that has a Change-ID.`,
+  )
   .action(async (changeId, options) => {
     try {
       const effect = showCommand(changeId, options).pipe(
@@ -383,7 +414,9 @@ program
 // review command
 program
   .command('review <change-id>')
-  .description('AI-powered code review that analyzes changes and optionally posts comments')
+  .description(
+    'AI-powered code review that analyzes changes and optionally posts comments (accepts change number or Change-ID)',
+  )
   .option('--comment', 'Post the review as comments (prompts for confirmation)')
   .option('-y, --yes', 'Skip confirmation prompts when posting comments')
   .option('--debug', 'Show debug output including AI responses')
@@ -408,20 +441,25 @@ Requirements:
   - Gerrit credentials must be configured (run 'ger setup' first)
 
 Examples:
-  # Review a change (display only)
+  # Review a change using change number (display only)
   $ ger review 12345
-  
+
+  # Review using Change-ID
+  $ ger review If5a3ae8cb5a107e187447802358417f311d0c4b1
+
   # Review and prompt to post comments
   $ ger review 12345 --comment
-  
+
   # Review and auto-post comments without prompting
   $ ger review 12345 --comment --yes
-  
+
   # Use specific AI tool
   $ ger review 12345 --tool gemini
-  
+
   # Show debug output to troubleshoot issues
   $ ger review 12345 --debug
+
+Note: Both change number (e.g., 12345) and Change-ID (e.g., If5a3ae8...) formats are accepted
 `,
   )
   .action(async (changeId, options) => {

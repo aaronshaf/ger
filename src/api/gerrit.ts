@@ -13,6 +13,7 @@ import {
 } from '@/schemas/gerrit'
 import { filterMeaningfulMessages } from '@/utils/message-filters'
 import { ConfigService } from '@/services/config'
+import { normalizeChangeIdentifier } from '@/utils/change-id'
 
 export interface GerritApiServiceImpl {
   readonly getChange: (changeId: string) => Effect.Effect<ChangeInfo, ApiError>
@@ -150,10 +151,21 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         return { credentials: normalizedCredentials, authHeader }
       })
 
+      // Helper to normalize and validate change identifier
+      const normalizeAndValidate = (changeId: string): Effect.Effect<string, ApiError> =>
+        Effect.try({
+          try: () => normalizeChangeIdentifier(changeId),
+          catch: (error) =>
+            new ApiError({
+              message: error instanceof Error ? error.message : String(error),
+            }),
+        })
+
       const getChange = (changeId: string) =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}`
           return yield* makeRequest(url, authHeader, 'GET', undefined, ChangeInfo)
         })
 
@@ -169,14 +181,16 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const postReview = (changeId: string, review: ReviewInput) =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/revisions/current/review`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/current/review`
           yield* makeRequest(url, authHeader, 'POST', review)
         })
 
       const abandonChange = (changeId: string, message?: string) =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/abandon`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/abandon`
           const body = message ? { message } : {}
           yield* makeRequest(url, authHeader, 'POST', body)
         })
@@ -199,14 +213,16 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const getRevision = (changeId: string, revisionId = 'current') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/revisions/${revisionId}`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/${revisionId}`
           return yield* makeRequest(url, authHeader, 'GET', undefined, RevisionInfo)
         })
 
       const getFiles = (changeId: string, revisionId = 'current') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/revisions/${revisionId}/files`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/${revisionId}/files`
           return yield* makeRequest(
             url,
             authHeader,
@@ -224,7 +240,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       ) =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          let url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/revisions/${revisionId}/files/${encodeURIComponent(filePath)}/diff`
+          const normalized = yield* normalizeAndValidate(changeId)
+          let url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/${revisionId}/files/${encodeURIComponent(filePath)}/diff`
           if (base) {
             url += `?base=${encodeURIComponent(base)}`
           }
@@ -234,7 +251,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const getFileContent = (changeId: string, filePath: string, revisionId = 'current') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/revisions/${revisionId}/files/${encodeURIComponent(filePath)}/content`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/${revisionId}/files/${encodeURIComponent(filePath)}/content`
 
           const response = yield* Effect.tryPromise({
             try: () =>
@@ -274,7 +292,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const getPatch = (changeId: string, revisionId = 'current') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/revisions/${revisionId}/patch`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/${revisionId}/patch`
 
           const response = yield* Effect.tryPromise({
             try: () =>
@@ -417,7 +436,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const getComments = (changeId: string, revisionId = 'current') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}/revisions/${revisionId}/comments`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/${revisionId}/comments`
           return yield* makeRequest(
             url,
             authHeader,
@@ -430,7 +450,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const getMessages = (changeId: string) =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(changeId)}?o=MESSAGES`
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}?o=MESSAGES`
           const response = yield* makeRequest(url, authHeader, 'GET')
 
           // Extract messages from the change response with runtime validation
