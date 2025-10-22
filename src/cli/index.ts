@@ -370,6 +370,7 @@ program
     'Show comprehensive change information (auto-detects from HEAD commit if not specified)',
   )
   .option('--xml', 'XML output for LLM consumption')
+  .option('--json', 'JSON output for programmatic consumption')
   .addHelpText(
     'after',
     `
@@ -383,6 +384,10 @@ Examples:
   # Auto-detect Change-ID from HEAD commit
   $ ger show
   $ ger show --xml
+  $ ger show --json
+
+  # Extract build failure URL with jq
+  $ ger show 392090 --json | jq -r '.messages[] | select(.message | contains("Build Failed")) | .message' | grep -oP 'https://[^\\s]+'
 
 Note: When no change-id is provided, it will be automatically extracted from the
       Change-ID footer in your HEAD commit. You must be in a git repository with
@@ -396,16 +401,17 @@ Note: When no change-id is provided, it will be automatically extracted from the
       )
       await Effect.runPromise(effect)
     } catch (error) {
-      if (options.xml) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (options.json) {
+        console.log(JSON.stringify({ status: 'error', error: errorMessage }, null, 2))
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<show_result>`)
         console.log(`  <status>error</status>`)
-        console.log(
-          `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-        )
+        console.log(`  <error><![CDATA[${errorMessage}]]></error>`)
         console.log(`</show_result>`)
       } else {
-        console.error('✗ Error:', error instanceof Error ? error.message : String(error))
+        console.error('✗ Error:', errorMessage)
       }
       process.exit(1)
     }
