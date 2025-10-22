@@ -1,11 +1,9 @@
-import { describe, test, expect, mock, beforeEach, afterEach, spyOn } from 'bun:test'
+import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test'
 import { Effect } from 'effect'
 import {
   extractChangeIdFromCommitMessage,
   getLastCommitMessage,
   getChangeIdFromHead,
-  GitError,
-  NoChangeIdError,
 } from './git-commit'
 import * as childProcess from 'node:child_process'
 import { EventEmitter } from 'node:events'
