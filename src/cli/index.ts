@@ -42,6 +42,7 @@ import { setup } from './commands/setup'
 import { showCommand } from './commands/show'
 import { statusCommand } from './commands/status'
 import { workspaceCommand } from './commands/workspace'
+import { sanitizeCDATA } from '@/utils/shell-safety'
 
 // Read version from package.json
 function getVersion(): string {
@@ -408,7 +409,7 @@ Note: When no change-id is provided, it will be automatically extracted from the
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<show_result>`)
         console.log(`  <status>error</status>`)
-        console.log(`  <error><![CDATA[${errorMessage}]]></error>`)
+        console.log(`  <error><![CDATA[${sanitizeCDATA(errorMessage)}]]></error>`)
         console.log(`</show_result>`)
       } else {
         console.error('✗ Error:', errorMessage)

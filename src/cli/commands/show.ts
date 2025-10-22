@@ -174,6 +174,13 @@ const formatShowPretty = (
   }
 }
 
+// Helper to remove undefined values from objects
+const removeUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, value]) => value !== undefined),
+  ) as Partial<T>
+}
+
 const formatShowJson = (
   changeDetails: ChangeDetails,
   diff: string,
@@ -182,50 +189,54 @@ const formatShowJson = (
 ): void => {
   const output = {
     status: 'success',
-    change: {
+    change: removeUndefined({
       id: changeDetails.id,
       number: changeDetails.number,
       subject: changeDetails.subject,
       status: changeDetails.status,
       project: changeDetails.project,
       branch: changeDetails.branch,
-      owner: changeDetails.owner,
+      owner: removeUndefined(changeDetails.owner),
       created: changeDetails.created,
       updated: changeDetails.updated,
-    },
+    }),
     diff,
-    comments: commentsWithContext.map(({ comment, context }) => ({
-      id: comment.id,
-      path: comment.path,
-      line: comment.line,
-      range: comment.range,
-      author: comment.author
-        ? {
-            name: comment.author.name,
-            email: comment.author.email,
-            account_id: comment.author._account_id,
-          }
-        : undefined,
-      updated: comment.updated,
-      message: comment.message,
-      unresolved: comment.unresolved,
-      in_reply_to: comment.in_reply_to,
-      context,
-    })),
-    messages: messages.map((message) => ({
-      id: message.id,
-      author: message.author
-        ? {
-            name: message.author.name,
-            email: message.author.email,
-            account_id: message.author._account_id,
-          }
-        : undefined,
-      date: message.date,
-      message: message.message,
-      revision: message._revision_number,
-      tag: message.tag,
-    })),
+    comments: commentsWithContext.map(({ comment, context }) =>
+      removeUndefined({
+        id: comment.id,
+        path: comment.path,
+        line: comment.line,
+        range: comment.range,
+        author: comment.author
+          ? removeUndefined({
+              name: comment.author.name,
+              email: comment.author.email,
+              account_id: comment.author._account_id,
+            })
+          : undefined,
+        updated: comment.updated,
+        message: comment.message,
+        unresolved: comment.unresolved,
+        in_reply_to: comment.in_reply_to,
+        context,
+      }),
+    ),
+    messages: messages.map((message) =>
+      removeUndefined({
+        id: message.id,
+        author: message.author
+          ? removeUndefined({
+              name: message.author.name,
+              email: message.author.email,
+              account_id: message.author._account_id,
+            })
+          : undefined,
+        date: message.date,
+        message: message.message,
+        revision: message._revision_number,
+        tag: message.tag,
+      }),
+    ),
   }
 
   console.log(JSON.stringify(output, null, 2))
