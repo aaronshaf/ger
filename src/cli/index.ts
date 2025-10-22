@@ -365,11 +365,29 @@ program
 
 // show command
 program
-  .command('show <change-id>')
+  .command('show [change-id]')
   .description(
-    'Show comprehensive change information including metadata, diff, and all comments (accepts change number or Change-ID)',
+    'Show comprehensive change information (auto-detects from HEAD commit if not specified)',
   )
   .option('--xml', 'XML output for LLM consumption')
+  .addHelpText(
+    'after',
+    `
+Examples:
+  # Show specific change (using change number)
+  $ ger show 392385
+
+  # Show specific change (using Change-ID)
+  $ ger show If5a3ae8cb5a107e187447802358417f311d0c4b1
+
+  # Auto-detect Change-ID from HEAD commit
+  $ ger show
+  $ ger show --xml
+
+Note: When no change-id is provided, it will be automatically extracted from the
+      Change-ID footer in your HEAD commit. You must be in a git repository with
+      a commit that has a Change-ID.`,
+  )
   .action(async (changeId, options) => {
     try {
       const effect = showCommand(changeId, options).pipe(

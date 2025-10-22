@@ -7,6 +7,7 @@ import { formatDiffPretty } from '@/utils/diff-formatters'
 import { sanitizeCDATA, escapeXML } from '@/utils/shell-safety'
 import { formatDate } from '@/utils/formatters'
 import { sortMessagesByDate } from '@/utils/message-filters'
+import { getChangeIdFromHead, GitError, NoChangeIdError } from '@/utils/git-commit'
 
 interface ShowOptions {
   xml?: boolean
@@ -248,16 +249,19 @@ const formatShowXml = (
 }
 
 export const showCommand = (
-  changeId: string,
+  changeId: string | undefined,
   options: ShowOptions,
-): Effect.Effect<void, ApiError | Error, GerritApiService> =>
+): Effect.Effect<void, ApiError | Error | GitError | NoChangeIdError, GerritApiService> =>
   Effect.gen(function* () {
+    // Auto-detect Change-ID from HEAD commit if not provided
+    const resolvedChangeId = changeId || (yield* getChangeIdFromHead())
+
     // Fetch all data concurrently
     const [changeDetails, diff, commentsAndMessages] = yield* Effect.all(
       [
-        getChangeDetails(changeId),
-        getDiffForChange(changeId),
-        getCommentsAndMessagesForChange(changeId),
+        getChangeDetails(resolvedChangeId),
+        getDiffForChange(resolvedChangeId),
+        getCommentsAndMessagesForChange(resolvedChangeId),
       ],
       { concurrency: 'unbounded' },
     )
@@ -267,7 +271,7 @@ export const showCommand = (
     // Get context for each comment using concurrent requests
     const contextEffects = comments.map((comment) =>
       comment.path && comment.line
-        ? getDiffContext(changeId, comment.path, comment.line).pipe(
+        ? getDiffContext(resolvedChangeId, comment.path, comment.line).pipe(
             Effect.map((context) => ({ comment, context })),
             // Graceful degradation for diff fetch failures
             Effect.catchAll(() => Effect.succeed({ comment, context: undefined })),
@@ -288,15 +292,20 @@ export const showCommand = (
     }
   }).pipe(
     // Regional error boundary for the entire command
-    Effect.catchTag('ApiError', (error) => {
+    Effect.catchAll((error) => {
+      const errorMessage =
+        error instanceof GitError || error instanceof NoChangeIdError || error instanceof Error
+          ? error.message
+          : String(error)
+
       if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<show_result>`)
         console.log(`  <status>error</status>`)
-        console.log(`  <error><![CDATA[${error.message}]]></error>`)
+        console.log(`  <error><![CDATA[${errorMessage}]]></error>`)
         console.log(`</show_result>`)
       } else {
-        console.error(`✗ Failed to fetch change details: ${error.message}`)
+        console.error(`✗ Error: ${errorMessage}`)
       }
       return Effect.succeed(undefined)
     }),
