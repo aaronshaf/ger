@@ -2,7 +2,7 @@
 
 ## Technology Stack
 - **Runtime**: Bun
-- **Language**: TypeScript
+- **Language**: TypeScript with isolatedDeclarations: true
 - **CLI Framework**: Ink with ink-spinner and ink-text-input
 - **State Management**: Effect and Effect Schema
 - **Testing**: Bun test with MSW
@@ -15,11 +15,7 @@
 
 ### Code Quality
 - **NO** implicit any or noExplicitAny in TypeScript
-- **isolatedDeclarations**: Currently disabled due to Effect v3 incompatibility
-  - Effect's `Context.Tag` and `Schema.TaggedError` use dynamic type expressions that are incompatible with TypeScript's `isolatedDeclarations` feature
-  - This is a known limitation tracked at: https://github.com/Effect-TS/effect/issues/3390
-  - Will be enabled when Effect v4 or a compatible version is available
-  - See tsconfig.json for current status and TODO comment
+- **MUST** use isolatedDeclarations: true in tsconfig.json
 - **ONLY** use .ts files (no .js/.jsx/.tsx files - this is a CLI tool)
 - **NEVER** use `as` typecasting except for `as const` or `as unknown`
 - **NEVER** use --no-verify flag with git commands
