@@ -2,32 +2,30 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    types: [opened, synchronize, ready_for_review, reopened]
+    paths:
+      - "src/**/*.ts"
+      - "tests/**/*.ts"
+      - "scripts/**/*.ts"
+      - "package.json"
+      - "tsconfig.json"
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-    
+    # Skip draft PRs and PRs from bots
+    if: |
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
       id-token: write
-    
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
@@ -36,19 +34,50 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
-            
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
-          
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+          # Enable progress tracking for sticky comments
+          track_progress: true
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Perform a comprehensive code review focusing on:
+
+            1. **Code Quality & Standards**
+               - Adherence to CLAUDE.md project rules
+               - TypeScript best practices with isolatedDeclarations
+               - No implicit any or as typecasting (except as const/as unknown)
+               - Functional programming patterns with Effect
+               - Files should not exceed 700 lines (block) or 500 lines (warn)
+
+            2. **Testing & Coverage**
+               - Minimum 80% code coverage requirement
+               - Both unit tests and integration tests for command changes
+               - Proper HTTP mocking with Bun's native fetch
+               - Effect Schema validation in tests
+
+            3. **Security**
+               - No sensitive data in code or error messages
+               - Effect Schema validation for all inputs
+               - SQL injection prevention
+
+            4. **Architecture & Patterns**
+               - Effect services implementation
+               - Cache-first strategy with SQLite
+               - Regional error boundaries
+               - Proper i18n with i18next
+
+            5. **Performance**
+               - Efficient caching strategies
+               - Minimized API calls
+               - Bundle size optimization
+
+            Provide detailed feedback using inline comments for specific issues.
+            Use top-level comments for general observations.
+            Reference file:line_number for all findings.
+
+          # Tools for comprehensive PR review with inline comments
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"
 
