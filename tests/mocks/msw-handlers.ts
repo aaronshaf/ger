@@ -1,7 +1,7 @@
-import { HttpResponse, http } from 'msw'
+import { HttpResponse, http, type HttpHandler } from 'msw'
 import type { CommentInfo } from '@/schemas/gerrit'
 
-export const commentHandlers = [
+export const commentHandlers: HttpHandler[] = [
   // Comments endpoint
   http.get('*/a/changes/:changeId/revisions/:revisionId/comments', () => {
     const mockComments: Record<string, CommentInfo[]> = {
@@ -73,7 +73,7 @@ export const commentHandlers = [
   }),
 ]
 
-export const emptyCommentsHandlers = [
+export const emptyCommentsHandlers: HttpHandler[] = [
   http.get('*/a/changes/:changeId/revisions/:revisionId/comments', () => {
     return HttpResponse.text(`)]}'\n{}`)
   }),

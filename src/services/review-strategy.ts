@@ -12,10 +12,23 @@ const extractResponse = (stdout: string): string => {
 }
 
 // Simple strategy focused only on review needs
-export class ReviewStrategyError extends Data.TaggedError('ReviewStrategyError')<{
-  message: string
-  cause?: unknown
-}> {}
+export interface ReviewStrategyErrorFields {
+  readonly message: string
+  readonly cause?: unknown
+}
+
+const ReviewStrategyErrorBase = Data.TaggedError(
+  'ReviewStrategyError',
+)<ReviewStrategyErrorFields> as unknown
+
+export class ReviewStrategyError
+  extends (ReviewStrategyErrorBase as new (
+    args: ReviewStrategyErrorFields,
+  ) => ReviewStrategyErrorFields & Error & { readonly _tag: 'ReviewStrategyError' })
+  implements Error
+{
+  readonly name = 'ReviewStrategyError'
+}
 
 // Review strategy interface - focused on specific review patterns
 export interface ReviewStrategy {
@@ -220,6 +233,8 @@ export const ReviewStrategyService: Context.Tag<
   ReviewStrategyServiceImpl,
   ReviewStrategyServiceImpl
 > = Context.GenericTag<ReviewStrategyServiceImpl>('ReviewStrategyService')
+
+export type ReviewStrategyService = Context.Tag.Identifier<typeof ReviewStrategyService>
 
 export const ReviewStrategyServiceLive: Layer.Layer<ReviewStrategyServiceImpl> = Layer.succeed(
   ReviewStrategyService,

@@ -270,7 +270,7 @@ const setupEffect = (configService: ConfigServiceImpl) =>
     ),
   )
 
-export async function setup() {
+export async function setup(): Promise<void> {
   const program = pipe(
     ConfigService,
     Effect.flatMap((configService) => setupEffect(configService)),

@@ -1,7 +1,13 @@
 import { Schema } from '@effect/schema'
 
 // Flat Application Configuration (similar to ji structure)
-export const AppConfig = Schema.Struct({
+export const AppConfig: Schema.Struct<{
+  host: typeof Schema.String
+  username: typeof Schema.String
+  password: typeof Schema.String
+  aiTool: Schema.optional<Schema.Literal<['claude', 'llm', 'opencode', 'gemini']>>
+  aiAutoDetect: Schema.optionalWith<typeof Schema.Boolean, { default: () => boolean }>
+}> = Schema.Struct({
   // Gerrit credentials (flattened)
   host: Schema.String.pipe(
     Schema.pattern(/^https?:\/\/.+$/),
@@ -17,15 +23,18 @@ export const AppConfig = Schema.Struct({
   ),
   // AI configuration (flattened)
   aiTool: Schema.optional(Schema.Literal('claude', 'llm', 'opencode', 'gemini')),
-  aiAutoDetect: Schema.optionalWith(Schema.Boolean, { default: () => true }),
+  aiAutoDetect: Schema.optionalWith(Schema.Boolean, { default: (): boolean => true }),
 })
 
 export type AppConfig = Schema.Schema.Type<typeof AppConfig>
 
 // Legacy schemas for backward compatibility (deprecated)
-export const AiConfig = Schema.Struct({
+export const AiConfig: Schema.Struct<{
+  tool: Schema.optional<Schema.Literal<['claude', 'llm', 'opencode', 'gemini']>>
+  autoDetect: Schema.optionalWith<typeof Schema.Boolean, { default: () => boolean }>
+}> = Schema.Struct({
   tool: Schema.optional(Schema.Literal('claude', 'llm', 'opencode', 'gemini')),
-  autoDetect: Schema.optionalWith(Schema.Boolean, { default: () => true }),
+  autoDetect: Schema.optionalWith(Schema.Boolean, { default: (): boolean => true }),
 })
 
 export type AiConfig = Schema.Schema.Type<typeof AiConfig>

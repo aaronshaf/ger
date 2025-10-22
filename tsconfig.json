@@ -18,7 +18,8 @@
     "types": [
       "bun-types"
     ],
-    "isolatedDeclarations": false, // Partial progress: Service tags work, TaggedErrors need more work (see commit a0161da)
+    "declaration": true,
+    "isolatedDeclarations": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,

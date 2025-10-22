@@ -5,30 +5,84 @@ import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 
-// Error types
-export class WorktreeCreationError extends Schema.TaggedError<WorktreeCreationError>()(
+// Error types with explicit interfaces
+export interface WorktreeCreationErrorFields {
+  readonly message: string
+  readonly cause?: unknown
+}
+
+const WorktreeCreationErrorSchema = Schema.TaggedError<WorktreeCreationErrorFields>()(
   'WorktreeCreationError',
   {
     message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
   },
-) {}
+) as unknown
 
-export class PatchsetFetchError extends Schema.TaggedError<PatchsetFetchError>()(
+export class WorktreeCreationError
+  extends (WorktreeCreationErrorSchema as new (
+    args: WorktreeCreationErrorFields,
+  ) => WorktreeCreationErrorFields & Error & { readonly _tag: 'WorktreeCreationError' })
+  implements Error
+{
+  readonly name = 'WorktreeCreationError'
+}
+
+export interface PatchsetFetchErrorFields {
+  readonly message: string
+  readonly cause?: unknown
+}
+
+const PatchsetFetchErrorSchema = Schema.TaggedError<PatchsetFetchErrorFields>()(
   'PatchsetFetchError',
   {
     message: Schema.String,
     cause: Schema.optional(Schema.Unknown),
   },
-) {}
+) as unknown
 
-export class DirtyRepoError extends Schema.TaggedError<DirtyRepoError>()('DirtyRepoError', {
-  message: Schema.String,
-}) {}
+export class PatchsetFetchError
+  extends (PatchsetFetchErrorSchema as new (
+    args: PatchsetFetchErrorFields,
+  ) => PatchsetFetchErrorFields & Error & { readonly _tag: 'PatchsetFetchError' })
+  implements Error
+{
+  readonly name = 'PatchsetFetchError'
+}
 
-export class NotGitRepoError extends Schema.TaggedError<NotGitRepoError>()('NotGitRepoError', {
+export interface DirtyRepoErrorFields {
+  readonly message: string
+}
+
+const DirtyRepoErrorSchema = Schema.TaggedError<DirtyRepoErrorFields>()('DirtyRepoError', {
   message: Schema.String,
-}) {}
+}) as unknown
+
+export class DirtyRepoError
+  extends (DirtyRepoErrorSchema as new (
+    args: DirtyRepoErrorFields,
+  ) => DirtyRepoErrorFields & Error & { readonly _tag: 'DirtyRepoError' })
+  implements Error
+{
+  readonly name = 'DirtyRepoError'
+}
+
+export interface NotGitRepoErrorFields {
+  readonly message: string
+}
+
+const NotGitRepoErrorSchema = Schema.TaggedError<NotGitRepoErrorFields>()('NotGitRepoError', {
+  message: Schema.String,
+}) as unknown
+
+export class NotGitRepoError
+  extends (NotGitRepoErrorSchema as new (
+    args: NotGitRepoErrorFields,
+  ) => NotGitRepoErrorFields & Error & { readonly _tag: 'NotGitRepoError' })
+  implements Error
+{
+  readonly name = 'NotGitRepoError'
+}
 
 export type GitError = WorktreeCreationError | PatchsetFetchError | DirtyRepoError | NotGitRepoError
 
@@ -289,6 +343,8 @@ const GitWorktreeServiceImplLive: GitWorktreeServiceImpl = {
 // Export service tag for dependency injection with explicit type
 export const GitWorktreeService: Context.Tag<GitWorktreeServiceImpl, GitWorktreeServiceImpl> =
   Context.GenericTag<GitWorktreeServiceImpl>('GitWorktreeService')
+
+export type GitWorktreeService = Context.Tag.Identifier<typeof GitWorktreeService>
 
 // Export service layer with explicit type
 export const GitWorktreeServiceLive: Layer.Layer<GitWorktreeServiceImpl> = Layer.succeed(

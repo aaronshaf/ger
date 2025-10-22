@@ -26,10 +26,20 @@ export interface ConfigErrorFields {
   readonly message: string
 }
 
-// Export the error class with explicit type
-export class ConfigError extends Schema.TaggedError<ConfigError>()('ConfigError', {
+// Define error schema (not exported, so type can be implicit)
+const ConfigErrorSchema = Schema.TaggedError<ConfigErrorFields>()('ConfigError', {
   message: Schema.String,
-} as const) {}
+} as const) as unknown
+
+// Export the error class with explicit constructor signature for isolatedDeclarations
+export class ConfigError
+  extends (ConfigErrorSchema as new (
+    args: ConfigErrorFields,
+  ) => ConfigErrorFields & Error & { readonly _tag: 'ConfigError' })
+  implements Error
+{
+  readonly name = 'ConfigError'
+}
 
 // File-based storage
 const CONFIG_DIR = path.join(os.homedir(), '.ger')

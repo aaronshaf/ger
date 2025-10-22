@@ -63,11 +63,21 @@ export interface ApiErrorFields {
   readonly status?: number
 }
 
-// Export the error class with explicit type
-export class ApiError extends Schema.TaggedError<ApiError>()('ApiError', {
+// Define error schema (not exported, so type can be implicit)
+const ApiErrorSchema = Schema.TaggedError<ApiErrorFields>()('ApiError', {
   message: Schema.String,
   status: Schema.optional(Schema.Number),
-} as const) {}
+} as const) as unknown
+
+// Export the error class with explicit constructor signature for isolatedDeclarations
+export class ApiError
+  extends (ApiErrorSchema as new (
+    args: ApiErrorFields,
+  ) => ApiErrorFields & Error & { readonly _tag: 'ApiError' })
+  implements Error
+{
+  readonly name = 'ApiError'
+}
 
 const createAuthHeader = (credentials: GerritCredentials): string => {
   const auth = btoa(`${credentials.username}:${credentials.password}`)

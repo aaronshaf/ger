@@ -1,5 +1,9 @@
 import { Effect, pipe, Schema, Layer } from 'effect'
-import { ReviewStrategyService, type ReviewStrategy } from '@/services/review-strategy'
+import {
+  ReviewStrategyService,
+  type ReviewStrategy,
+  ReviewStrategyError,
+} from '@/services/review-strategy'
 import { commentCommandWithInput } from './comment'
 import { Console } from 'effect'
 import { type ApiError, GerritApiService } from '@/api/gerrit'
@@ -314,7 +318,14 @@ const promptUser = (message: string): Effect.Effect<boolean, never> =>
     })
   })
 
-export const reviewCommand = (changeId: string, options: ReviewOptions = {}) =>
+export const reviewCommand = (
+  changeId: string,
+  options: ReviewOptions = {},
+): Effect.Effect<
+  void,
+  Error | ReviewStrategyError,
+  GerritApiService | ReviewStrategyService | GitWorktreeService
+> =>
   Effect.gen(function* () {
     const reviewStrategy = yield* ReviewStrategyService
     const gitService = yield* GitWorktreeService
