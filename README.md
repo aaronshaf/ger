@@ -52,6 +52,9 @@ ger comment 12345 -m "LGTM"
 # Get diff for review
 ger diff 12345
 
+# Extract URLs from messages (e.g., Jenkins build links)
+ger extract-url "build-summary-report" | tail -1
+
 # AI-powered code review (requires claude, llm, or opencode CLI)
 ger review 12345
 ger review 12345 --dry-run  # Preview without posting
@@ -189,6 +192,54 @@ cat comments.json | ger comment 12345 --batch
 # View all comments with diff context
 ger comments 12345
 ger comments 12345 --pretty
+```
+
+### Extract URLs
+
+Extract URLs from change messages and comments for automation and scripting:
+
+```bash
+# Extract all Jenkins build-summary-report URLs
+ger extract-url "build-summary-report"
+
+# Get the latest build URL (using tail)
+ger extract-url "build-summary-report" | tail -1
+
+# Get the first/oldest build URL (using head)
+ger extract-url "jenkins" | head -1
+
+# For a specific change
+ger extract-url "build-summary" 12345
+
+# Use regex for precise matching
+ger extract-url "job/Canvas/job/main/\d+/" --regex
+
+# Search both messages and inline comments
+ger extract-url "github.com" --include-comments
+
+# JSON output for scripting
+ger extract-url "jenkins" --json | jq -r '.urls[-1]'
+
+# XML output
+ger extract-url "jenkins" --xml
+```
+
+#### How it works:
+- **Pattern matching**: Substring match by default, regex with `--regex`
+- **Sources**: Searches messages by default, add `--include-comments` to include inline comments
+- **Ordering**: URLs are output in chronological order (oldest first)
+- **Composable**: Pipe to `tail -1` for latest, `head -1` for oldest
+
+#### Common use cases:
+```bash
+# Get latest Jenkins build URL for a change
+ger extract-url "jenkins.inst-ci.net" | tail -1
+
+# Find all GitHub PR references
+ger extract-url "github.com" --include-comments
+
+# Extract specific build job URLs with regex
+ger extract-url "job/[^/]+/job/[^/]+/\d+/$" --regex
 ```
 
 ### Diff
