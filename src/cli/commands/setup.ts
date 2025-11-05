@@ -11,6 +11,7 @@ import { AppConfig } from '@/schemas/config'
 import { Schema } from '@effect/schema'
 import { input, password } from '@inquirer/prompts'
 import { spawn } from 'node:child_process'
+import { normalizeGerritHost } from '@/utils/url-parser'
 
 // Check if a command exists on the system
 const checkCommandExists = (command: string): Promise<boolean> =>
@@ -209,7 +210,7 @@ const setupEffect = (configService: ConfigServiceImpl) =>
 
                 // Build flat config
                 const configData = {
-                  host: host.trim().replace(/\/$/, ''), // Remove trailing slash
+                  host: normalizeGerritHost(host),
                   username: username.trim(),
                   password: passwordValue,
                   ...(aiToolCommand && {

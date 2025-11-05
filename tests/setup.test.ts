@@ -1,17 +1,13 @@
 import { describe, test, expect } from 'bun:test'
+import { normalizeGerritHost } from '@/utils/url-parser'
 
 describe('Setup Command', () => {
-  describe('URL processing', () => {
-    test('should remove trailing slashes', () => {
-      const url = 'https://gerrit.example.com/'
-      const normalized = url.replace(/\/$/, '')
-      expect(normalized).toBe('https://gerrit.example.com')
-    })
-
-    test('should handle URLs without trailing slashes', () => {
-      const url = 'https://gerrit.example.com'
-      const normalized = url.replace(/\/$/, '')
-      expect(normalized).toBe('https://gerrit.example.com')
+  describe('URL normalization integration', () => {
+    test('should normalize host URL using normalizeGerritHost', () => {
+      // Test that the utility function is working as expected
+      expect(normalizeGerritHost('gerrit.example.com')).toBe('https://gerrit.example.com')
+      expect(normalizeGerritHost('https://gerrit.example.com/')).toBe('https://gerrit.example.com')
+      expect(normalizeGerritHost('gerrit.example.com:8080')).toBe('https://gerrit.example.com:8080')
     })
   })
 

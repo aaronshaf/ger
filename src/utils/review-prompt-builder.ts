@@ -1,6 +1,5 @@
 import { Effect } from 'effect'
 import { type ApiError, GerritApiService } from '@/api/gerrit'
-import type { CommentInfo, MessageInfo } from '@/schemas/gerrit'
 import { flattenComments } from '@/utils/review-formatters'
 
 export const buildEnhancedPrompt = (

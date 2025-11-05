@@ -199,7 +199,7 @@ ger comments 12345 --pretty
 Extract URLs from change messages and comments for automation and scripting:
 
 ```bash
-# Extract all Jenkins build-summary-report URLs
+# Extract URLs from current HEAD commit's change (auto-detect)
 ger extract-url "build-summary-report"
 
 # Get the latest build URL (using tail)
@@ -208,8 +208,14 @@ ger extract-url "build-summary-report" | tail -1
 # Get the first/oldest build URL (using head)
 ger extract-url "jenkins" | head -1
 
-# For a specific change
+# For a specific change (using change number)
 ger extract-url "build-summary" 12345
+
+# For a specific change (using Change-ID)
+ger extract-url "build-summary" If5a3ae8cb5a107e187447802358417f311d0c4b1
+
+# Chain with other tools for specific change
+ger extract-url "build-summary-report" 12345 | tail -1 | jk failures --smart --xml
 
 # Use regex for precise matching
 ger extract-url "job/Canvas/job/main/\d+/" --regex
@@ -225,6 +231,7 @@ ger extract-url "jenkins" --xml
 ```
 
 #### How it works:
+- **Change detection**: Auto-detects Change-ID from HEAD commit if not specified, or accepts explicit change number/Change-ID
 - **Pattern matching**: Substring match by default, regex with `--regex`
 - **Sources**: Searches messages by default, add `--include-comments` to include inline comments
 - **Ordering**: URLs are output in chronological order (oldest first)

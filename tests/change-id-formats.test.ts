@@ -76,7 +76,7 @@ ${JSON.stringify(mockChange)}`)
     return HttpResponse.text('Not Found', { status: 404 })
   }),
 
-  http.post('*/a/changes/:changeId/revisions/current/review', async ({ params, request }) => {
+  http.post('*/a/changes/:changeId/revisions/current/review', async ({ params }) => {
     const { changeId } = params
     if (changeId === CHANGE_NUMBER || changeId === CHANGE_ID) {
       return HttpResponse.text(`)]}'

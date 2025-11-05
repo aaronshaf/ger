@@ -100,7 +100,7 @@ describe('Review Strategy', () => {
       }
     })
 
-    mockChildProcess.stderr.on.mockImplementation((event: string, callback: Function) => {
+    mockChildProcess.stderr.on.mockImplementation((_event: string, _callback: Function) => {
       // No stderr for success
     })
 
@@ -112,7 +112,7 @@ describe('Review Strategy', () => {
   }
 
   const setupFailedExecution = (exitCode = 1, stderr = 'Command failed') => {
-    mockChildProcess.stdout.on.mockImplementation((event: string, callback: Function) => {
+    mockChildProcess.stdout.on.mockImplementation((_event: string, _callback: Function) => {
       // No stdout for failure
     })
 

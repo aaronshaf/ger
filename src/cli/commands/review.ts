@@ -1,22 +1,8 @@
-import { Effect, pipe, Schema, Layer } from 'effect'
-import {
-  ReviewStrategyService,
-  type ReviewStrategy,
-  ReviewStrategyError,
-} from '@/services/review-strategy'
+import { Effect, pipe, Schema } from 'effect'
+import { ReviewStrategyService, ReviewStrategyError } from '@/services/review-strategy'
 import { commentCommandWithInput } from './comment'
 import { Console } from 'effect'
-import { type ApiError, GerritApiService } from '@/api/gerrit'
-import type { CommentInfo } from '@/schemas/gerrit'
-import { sanitizeCDATA, escapeXML } from '@/utils/shell-safety'
-import { formatDiffPretty } from '@/utils/diff-formatters'
-import { formatDate } from '@/utils/formatters'
-import {
-  formatChangeAsXML,
-  formatCommentsAsXML,
-  formatMessagesAsXML,
-  flattenComments,
-} from '@/utils/review-formatters'
+import { GerritApiService } from '@/api/gerrit'
 import { buildEnhancedPrompt } from '@/utils/review-prompt-builder'
 import * as fs from 'node:fs/promises'
 import * as fsSync from 'node:fs'
@@ -25,7 +11,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 import * as readline from 'node:readline'
-import { GitWorktreeService, GitWorktreeServiceLive } from '@/services/git-worktree'
+import { GitWorktreeService } from '@/services/git-worktree'
 
 // Get the directory of this module
 const __filename = fileURLToPath(import.meta.url)
@@ -126,7 +112,7 @@ const validateAndFixInlineComments = (
     for (const rawComment of rawComments) {
       // Validate comment structure using Effect Schema
       const parseResult = yield* Schema.decodeUnknown(InlineCommentSchema)(rawComment).pipe(
-        Effect.catchTag('ParseError', (parseError) =>
+        Effect.catchTag('ParseError', (_parseError) =>
           Effect.gen(function* () {
             yield* Console.warn('Skipping comment with invalid structure')
             return yield* Effect.succeed(null)
@@ -190,118 +176,6 @@ const validateAndFixInlineComments = (
     }
 
     return validComments
-  })
-
-// Legacy helper for backward compatibility (will be removed)
-const getChangeDataAsXml = (changeId: string): Effect.Effect<string, ApiError, GerritApiService> =>
-  Effect.gen(function* () {
-    const gerritApi = yield* GerritApiService
-
-    // Fetch all data
-    const change = yield* gerritApi.getChange(changeId)
-    const diffResult = yield* gerritApi.getDiff(changeId)
-    const diff = typeof diffResult === 'string' ? diffResult : JSON.stringify(diffResult)
-    const commentsMap = yield* gerritApi.getComments(changeId)
-    const messages = yield* gerritApi.getMessages(changeId)
-
-    const comments = flattenComments(commentsMap)
-
-    // Build XML string using helper functions
-    const xmlLines: string[] = []
-    xmlLines.push(`<?xml version="1.0" encoding="UTF-8"?>`)
-    xmlLines.push(`<show_result>`)
-    xmlLines.push(`  <status>success</status>`)
-    xmlLines.push(...formatChangeAsXML(change))
-    xmlLines.push(`  <diff><![CDATA[${sanitizeCDATA(diff)}]]></diff>`)
-    xmlLines.push(...formatCommentsAsXML(comments))
-    xmlLines.push(...formatMessagesAsXML(messages))
-    xmlLines.push(`</show_result>`)
-
-    return xmlLines.join('\n')
-  })
-
-// Helper to get change data and format as pretty string
-const getChangeDataAsPretty = (
-  changeId: string,
-): Effect.Effect<string, ApiError, GerritApiService> =>
-  Effect.gen(function* () {
-    const gerritApi = yield* GerritApiService
-
-    // Fetch all data
-    const change = yield* gerritApi.getChange(changeId)
-    const diffResult = yield* gerritApi.getDiff(changeId)
-    const diff = typeof diffResult === 'string' ? diffResult : JSON.stringify(diffResult)
-    const commentsMap = yield* gerritApi.getComments(changeId)
-    const messages = yield* gerritApi.getMessages(changeId)
-
-    const comments = flattenComments(commentsMap)
-
-    // Build pretty string
-    const lines: string[] = []
-
-    // Change details header
-    lines.push('━'.repeat(80))
-    lines.push(`📋 Change ${change._number}: ${change.subject}`)
-    lines.push('━'.repeat(80))
-    lines.push('')
-
-    // Metadata
-    lines.push('📝 Details:')
-    lines.push(`   Project: ${change.project}`)
-    lines.push(`   Branch: ${change.branch}`)
-    lines.push(`   Status: ${change.status}`)
-    lines.push(`   Owner: ${change.owner?.name || change.owner?.email || 'Unknown'}`)
-    lines.push(`   Created: ${change.created ? formatDate(change.created) : 'Unknown'}`)
-    lines.push(`   Updated: ${change.updated ? formatDate(change.updated) : 'Unknown'}`)
-    lines.push(`   Change-Id: ${change.change_id}`)
-    lines.push('')
-
-    // Diff section
-    lines.push('🔍 Diff:')
-    lines.push('─'.repeat(40))
-    lines.push(formatDiffPretty(diff))
-    lines.push('')
-
-    // Comments section
-    if (comments.length > 0) {
-      lines.push('💬 Inline Comments:')
-      lines.push('─'.repeat(40))
-      for (const comment of comments) {
-        const author = comment.author?.name || 'Unknown'
-        const date = comment.updated ? formatDate(comment.updated) : 'Unknown'
-        lines.push(`📅 ${date} - ${author}`)
-        if (comment.path) lines.push(`   File: ${comment.path}`)
-        if (comment.line) lines.push(`   Line: ${comment.line}`)
-        lines.push(`   ${comment.message}`)
-        if (comment.unresolved) lines.push(`   ⚠️ Unresolved`)
-        lines.push('')
-      }
-    }
-
-    // Messages section
-    if (messages.length > 0) {
-      lines.push('📝 Review Activity:')
-      lines.push('─'.repeat(40))
-      for (const message of messages) {
-        const author = message.author?.name || 'Unknown'
-        const date = formatDate(message.date)
-        const cleanMessage = message.message.trim()
-
-        // Skip very short automated messages
-        if (
-          cleanMessage.length < 10 &&
-          (cleanMessage.includes('Build') || cleanMessage.includes('Patch'))
-        ) {
-          continue
-        }
-
-        lines.push(`📅 ${date} - ${author}`)
-        lines.push(`   ${cleanMessage}`)
-        lines.push('')
-      }
-    }
-
-    return lines.join('\n')
   })
 
 // Helper function to prompt user for confirmation

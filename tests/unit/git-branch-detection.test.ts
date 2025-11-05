@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test'
 import { Effect, Layer } from 'effect'
-import { GitWorktreeService, GitWorktreeServiceLive } from '@/services/git-worktree'
+import { GitWorktreeService } from '@/services/git-worktree'
 
 describe('Git Worktree Creation', () => {
   test('should handle commit-based worktree creation in service interface', async () => {
@@ -11,7 +11,6 @@ describe('Git Worktree Creation', () => {
       validatePreconditions: () => Effect.succeed(undefined),
       createWorktree: (changeId: string) => {
         // Simulate commit-based worktree creation (detached HEAD)
-        const currentCommit = 'abc123def456' // Mock commit hash
         return Effect.succeed({
           path: `/tmp/test-worktree-${changeId}`,
           changeId,

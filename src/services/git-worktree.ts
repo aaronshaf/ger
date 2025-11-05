@@ -156,23 +156,6 @@ const validateGitRepo = (): Effect.Effect<void, NotGitRepoError, never> =>
     Effect.map(() => undefined),
   )
 
-// Check if working directory is clean
-const validateCleanRepo = (): Effect.Effect<void, DirtyRepoError, never> =>
-  pipe(
-    runGitCommand(['status', '--porcelain']),
-    Effect.mapError(() => new DirtyRepoError({ message: 'Failed to check repository status' })),
-    Effect.flatMap((output) =>
-      output.trim() === ''
-        ? Effect.succeed(undefined)
-        : Effect.fail(
-            new DirtyRepoError({
-              message:
-                'Working directory has uncommitted changes. Please commit or stash changes before review.',
-            }),
-          ),
-    ),
-  )
-
 // Generate unique worktree path
 const generateWorktreePath = (changeId: string): string => {
   const timestamp = Date.now()

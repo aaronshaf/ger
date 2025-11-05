@@ -54,6 +54,33 @@ export const extractChangeNumber = (input: string): string => {
 }
 
 /**
+ * Normalizes a Gerrit host URL by adding https:// if no protocol is provided
+ * and removing trailing slashes
+ *
+ * @param host - The host URL to normalize (e.g., "gerrit.example.com" or "https://gerrit.example.com")
+ * @returns The normalized URL with protocol and without trailing slash
+ *
+ * @example
+ * normalizeGerritHost("gerrit.example.com") // returns "https://gerrit.example.com"
+ * normalizeGerritHost("gerrit.example.com:8080") // returns "https://gerrit.example.com:8080"
+ * normalizeGerritHost("http://gerrit.example.com") // returns "http://gerrit.example.com"
+ * normalizeGerritHost("https://gerrit.example.com/") // returns "https://gerrit.example.com"
+ */
+export const normalizeGerritHost = (host: string): string => {
+  let normalized = host.trim()
+
+  // Add https:// if no protocol provided
+  if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+    normalized = `https://${normalized}`
+  }
+
+  // Remove trailing slash
+  normalized = normalized.replace(/\/$/, '')
+
+  return normalized
+}
+
+/**
  * Validates if a string is a valid Gerrit change identifier
  *
  * @param changeId - The change ID to validate
