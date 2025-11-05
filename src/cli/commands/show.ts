@@ -6,7 +6,6 @@ import { getDiffContext } from '@/utils/diff-context'
 import { formatDiffPretty } from '@/utils/diff-formatters'
 import { sanitizeCDATA, escapeXML } from '@/utils/shell-safety'
 import { formatDate } from '@/utils/formatters'
-import { sortMessagesByDate } from '@/utils/message-filters'
 import { getChangeIdFromHead, GitError, NoChangeIdError } from '@/utils/git-commit'
 
 interface ShowOptions {
@@ -88,15 +87,19 @@ const getCommentsAndMessagesForChange = (
       }
     }
 
-    // Sort inline comments by path and then by line number
+    // Sort inline comments by date (ascending - oldest first)
     allComments.sort((a, b) => {
-      const pathCompare = (a.path || '').localeCompare(b.path || '')
-      if (pathCompare !== 0) return pathCompare
-      return (a.line || 0) - (b.line || 0)
+      const dateA = a.updated ? new Date(a.updated).getTime() : 0
+      const dateB = b.updated ? new Date(b.updated).getTime() : 0
+      return dateA - dateB
     })
 
-    // Sort messages by date (newest first)
-    const sortedMessages = sortMessagesByDate(messages)
+    // Sort messages by date (ascending - oldest first)
+    const sortedMessages = [...messages].sort((a, b) => {
+      const dateA = new Date(a.date).getTime()
+      const dateB = new Date(b.date).getTime()
+      return dateA - dateB
+    })
 
     return { comments: allComments, messages: sortedMessages }
   })

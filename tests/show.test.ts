@@ -505,6 +505,42 @@ describe('show command', () => {
     expect(typeof parsed.error).toBe('string')
   })
 
+  test('should sort comments by date in ascending order in XML output', async () => {
+    setupMockHandlers()
+
+    const mockConfigLayer = createMockConfigLayer()
+    const program = showCommand('12345', { xml: true }).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    const output = capturedLogs.join('\n')
+
+    // Extract comment sections to verify order
+    const commentMatches = output.matchAll(
+      /<comment>[\s\S]*?<updated>(.*?)<\/updated>[\s\S]*?<message><!\[CDATA\[(.*?)\]\]><\/message>[\s\S]*?<\/comment>/g,
+    )
+    const comments = Array.from(commentMatches).map((match) => ({
+      updated: match[1],
+      message: match[2],
+    }))
+
+    // Should have 3 comments
+    expect(comments.length).toBe(3)
+
+    // Comments should be in ascending date order (oldest first)
+    expect(comments[0].updated).toBe('2024-01-15 11:00:00.000000000')
+    expect(comments[0].message).toBe('Clear commit message')
+
+    expect(comments[1].updated).toBe('2024-01-15 11:30:00.000000000')
+    expect(comments[1].message).toBe('Good improvement!')
+
+    expect(comments[2].updated).toBe('2024-01-15 11:45:00.000000000')
+    expect(comments[2].message).toBe('Consider adding JSDoc')
+  })
+
   test('should include messages in JSON output', async () => {
     const mockChange = generateMockChange({
       _number: 12345,
