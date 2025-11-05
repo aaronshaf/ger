@@ -34,6 +34,7 @@ import { abandonCommand } from './commands/abandon'
 import { commentCommand } from './commands/comment'
 import { commentsCommand } from './commands/comments'
 import { diffCommand } from './commands/diff'
+import { extractUrlCommand } from './commands/extract-url'
 import { incomingCommand } from './commands/incoming'
 import { mineCommand } from './commands/mine'
 import { openCommand } from './commands/open'
@@ -411,6 +412,77 @@ Note: When no change-id is provided, it will be automatically extracted from the
         console.log(`  <status>error</status>`)
         console.log(`  <error><![CDATA[${sanitizeCDATA(errorMessage)}]]></error>`)
         console.log(`</show_result>`)
+      } else {
+        console.error('✗ Error:', errorMessage)
+      }
+      process.exit(1)
+    }
+  })
+
+// extract-url command
+program
+  .command('extract-url <pattern> [change-id]')
+  .description(
+    'Extract URLs from change messages and comments (auto-detects from HEAD commit if not specified)',
+  )
+  .option('--include-comments', 'Also search inline comments (default: messages only)')
+  .option('--regex', 'Treat pattern as regex instead of substring match')
+  .option('--xml', 'XML output for LLM consumption')
+  .option('--json', 'JSON output for programmatic consumption')
+  .addHelpText(
+    'after',
+    `
+Examples:
+  # Extract all Jenkins build-summary-report URLs (substring match)
+  $ ger extract-url "build-summary-report"
+
+  # Get the latest build URL using tail
+  $ ger extract-url "build-summary-report" | tail -1
+
+  # Get the first build URL using head
+  $ ger extract-url "jenkins.inst-ci.net" | head -1
+
+  # For a specific change (using change number)
+  $ ger extract-url "build-summary" 391831
+
+  # For a specific change (using Change-ID)
+  $ ger extract-url "jenkins" If5a3ae8cb5a107e187447802358417f311d0c4b1
+
+  # Use regex for precise matching
+  $ ger extract-url "job/Canvas/job/main/\\d+/" --regex
+
+  # Search both messages and inline comments
+  $ ger extract-url "github.com" --include-comments
+
+  # JSON output for scripting
+  $ ger extract-url "jenkins" --json | jq -r '.urls[-1]'
+
+  # XML output
+  $ ger extract-url "jenkins" --xml
+
+Note:
+  - URLs are output in chronological order (oldest first)
+  - Use tail -1 to get the latest URL, head -1 for the oldest
+  - When no change-id is provided, it will be automatically extracted from the
+    Change-ID footer in your HEAD commit`,
+  )
+  .action(async (pattern, changeId, options) => {
+    try {
+      const effect = extractUrlCommand(pattern, changeId, options).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(ConfigServiceLive),
+      )
+      await Effect.runPromise(effect)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      if (options.json) {
+        console.log(JSON.stringify({ status: 'error', error: errorMessage }, null, 2))
+      } else if (options.xml) {
+        console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
+        console.log(`<extract_url_result>`)
+        console.log(`  <status>error</status>`)
+        console.log(`  <error><![CDATA[${sanitizeCDATA(errorMessage)}]]></error>`)
+        console.log(`</extract_url_result>`)
       } else {
         console.error('✗ Error:', errorMessage)
       }
