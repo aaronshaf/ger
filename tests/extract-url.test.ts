@@ -447,4 +447,72 @@ describe('extract-url command', () => {
     expect(output).toContain('https://docs.example.com/guide')
     expect(output).toContain('https://github.com/example/repo')
   })
+
+  test('should reject dangerous regex patterns (ReDoS protection)', async () => {
+    setupMockHandlers()
+
+    const mockConfigLayer = createMockConfigLayer()
+    // Use a pattern with nested quantifiers that could cause ReDoS
+    const program = extractUrlCommand('(a+)+', '12345', { regex: true }).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    const output = capturedErrors.join('\n')
+    expect(output).toContain('✗ Error:')
+    expect(output).toContain('dangerous nested quantifiers')
+  })
+
+  test('should handle invalid regex syntax gracefully', async () => {
+    setupMockHandlers()
+
+    const mockConfigLayer = createMockConfigLayer()
+    // Use invalid regex syntax
+    const program = extractUrlCommand('[invalid', '12345', { regex: true }).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    const output = capturedErrors.join('\n')
+    expect(output).toContain('✗ Error:')
+    expect(output).toContain('Invalid regular expression')
+  })
+
+  test('should validate pattern is not empty', async () => {
+    setupMockHandlers()
+
+    const mockConfigLayer = createMockConfigLayer()
+    const program = extractUrlCommand('', '12345', {}).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    const output = capturedErrors.join('\n')
+    expect(output).toContain('✗ Error:')
+    expect(output).toContain('Pattern cannot be empty')
+  })
+
+  test('should validate pattern is not too long', async () => {
+    setupMockHandlers()
+
+    const mockConfigLayer = createMockConfigLayer()
+    // Create a pattern longer than 500 characters
+    const longPattern = 'a'.repeat(501)
+    const program = extractUrlCommand(longPattern, '12345', {}).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    const output = capturedErrors.join('\n')
+    expect(output).toContain('✗ Error:')
+    expect(output).toContain('Pattern is too long')
+  })
 })
