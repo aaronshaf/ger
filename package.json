@@ -1,10 +1,55 @@
 {
   "name": "@aaronshaf/ger",
   "version": "0.2.1",
+  "description": "Gerrit CLI and SDK - A modern CLI tool and TypeScript SDK for Gerrit Code Review, built with Effect-TS",
+  "keywords": [
+    "gerrit",
+    "code-review",
+    "cli",
+    "sdk",
+    "effect",
+    "effect-ts",
+    "typescript",
+    "api-client"
+  ],
   "module": "index.ts",
   "type": "module",
   "bin": {
     "ger": "./bin/ger"
+  },
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "types": "./index.ts"
+    },
+    "./api": {
+      "import": "./src/api/gerrit.ts",
+      "types": "./src/api/gerrit.ts"
+    },
+    "./services/config": {
+      "import": "./src/services/config.ts",
+      "types": "./src/services/config.ts"
+    },
+    "./services/review-strategy": {
+      "import": "./src/services/review-strategy.ts",
+      "types": "./src/services/review-strategy.ts"
+    },
+    "./services/git-worktree": {
+      "import": "./src/services/git-worktree.ts",
+      "types": "./src/services/git-worktree.ts"
+    },
+    "./schemas/gerrit": {
+      "import": "./src/schemas/gerrit.ts",
+      "types": "./src/schemas/gerrit.ts"
+    },
+    "./schemas/config": {
+      "import": "./src/schemas/config.ts",
+      "types": "./src/schemas/config.ts"
+    },
+    "./utils": {
+      "import": "./src/utils/index.ts",
+      "types": "./src/utils/index.ts"
+    }
   },
   "repository": {
     "type": "git",

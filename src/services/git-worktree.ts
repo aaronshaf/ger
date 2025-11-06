@@ -84,7 +84,11 @@ export class NotGitRepoError
   readonly name = 'NotGitRepoError'
 }
 
-export type GitError = WorktreeCreationError | PatchsetFetchError | DirtyRepoError | NotGitRepoError
+export type GitWorktreeError =
+  | WorktreeCreationError
+  | PatchsetFetchError
+  | DirtyRepoError
+  | NotGitRepoError
 
 // Worktree info
 export interface WorktreeInfo {
@@ -99,8 +103,8 @@ export interface WorktreeInfo {
 const runGitCommand = (
   args: string[],
   options: { cwd?: string } = {},
-): Effect.Effect<string, GitError, never> =>
-  Effect.async<string, GitError, never>((resume) => {
+): Effect.Effect<string, GitWorktreeError, never> =>
+  Effect.async<string, GitWorktreeError, never>((resume) => {
     const child = spawn('git', args, {
       cwd: options.cwd || process.cwd(),
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -182,7 +186,7 @@ const buildRefspec = (changeNumber: string, patchsetNumber: number = 1): string 
 }
 
 // Get the current HEAD commit hash to avoid branch conflicts
-const getCurrentCommit = (): Effect.Effect<string, GitError, never> =>
+const getCurrentCommit = (): Effect.Effect<string, GitWorktreeError, never> =>
   pipe(
     runGitCommand(['rev-parse', 'HEAD']),
     Effect.map((output) => output.trim()),
@@ -226,11 +230,13 @@ const getLatestPatchsetNumber = (
 
 // GitWorktreeService implementation
 export interface GitWorktreeServiceImpl {
-  validatePreconditions: () => Effect.Effect<void, GitError, never>
-  createWorktree: (changeId: string) => Effect.Effect<WorktreeInfo, GitError, never>
-  fetchAndCheckoutPatchset: (worktreeInfo: WorktreeInfo) => Effect.Effect<void, GitError, never>
+  validatePreconditions: () => Effect.Effect<void, GitWorktreeError, never>
+  createWorktree: (changeId: string) => Effect.Effect<WorktreeInfo, GitWorktreeError, never>
+  fetchAndCheckoutPatchset: (
+    worktreeInfo: WorktreeInfo,
+  ) => Effect.Effect<void, GitWorktreeError, never>
   cleanup: (worktreeInfo: WorktreeInfo) => Effect.Effect<void, never, never>
-  getChangedFiles: () => Effect.Effect<string[], GitError, never>
+  getChangedFiles: () => Effect.Effect<string[], GitWorktreeError, never>
 }
 
 const GitWorktreeServiceImplLive: GitWorktreeServiceImpl = {
