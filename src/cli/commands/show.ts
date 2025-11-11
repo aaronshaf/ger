@@ -7,6 +7,7 @@ import { formatDiffPretty } from '@/utils/diff-formatters'
 import { sanitizeCDATA, escapeXML } from '@/utils/shell-safety'
 import { formatDate } from '@/utils/formatters'
 import { getChangeIdFromHead, GitError, NoChangeIdError } from '@/utils/git-commit'
+import { writeFileSync } from 'node:fs'
 
 interface ShowOptions {
   xml?: boolean
@@ -184,12 +185,12 @@ const removeUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
   ) as Partial<T>
 }
 
-const formatShowJson = (
+const formatShowJson = async (
   changeDetails: ChangeDetails,
   diff: string,
   commentsWithContext: Array<{ comment: CommentInfo; context?: any }>,
   messages: MessageInfo[],
-): void => {
+): Promise<void> => {
   const output = {
     status: 'success',
     change: removeUndefined({
@@ -242,82 +243,118 @@ const formatShowJson = (
     ),
   }
 
-  console.log(JSON.stringify(output, null, 2))
+  const jsonOutput = JSON.stringify(output, null, 2) + '\n'
+  // Write to stdout and ensure all data is flushed before process exits
+  // Using process.stdout.write with drain handling for large payloads
+  return new Promise<void>((resolve, reject) => {
+    const written = process.stdout.write(jsonOutput, (err) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+
+    if (!written) {
+      // If write returned false, buffer is full, wait for drain
+      process.stdout.once('drain', resolve)
+      process.stdout.once('error', reject)
+    }
+  })
 }
 
-const formatShowXml = (
+const formatShowXml = async (
   changeDetails: ChangeDetails,
   diff: string,
   commentsWithContext: Array<{ comment: CommentInfo; context?: any }>,
   messages: MessageInfo[],
-): void => {
-  console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-  console.log(`<show_result>`)
-  console.log(`  <status>success</status>`)
-  console.log(`  <change>`)
-  console.log(`    <id>${escapeXML(changeDetails.id)}</id>`)
-  console.log(`    <number>${changeDetails.number}</number>`)
-  console.log(`    <subject><![CDATA[${sanitizeCDATA(changeDetails.subject)}]]></subject>`)
-  console.log(`    <status>${escapeXML(changeDetails.status)}</status>`)
-  console.log(`    <project>${escapeXML(changeDetails.project)}</project>`)
-  console.log(`    <branch>${escapeXML(changeDetails.branch)}</branch>`)
-  console.log(`    <owner>`)
+): Promise<void> => {
+  // Build complete XML output as a single string to avoid multiple writes
+  const xmlParts: string[] = []
+  xmlParts.push(`<?xml version="1.0" encoding="UTF-8"?>`)
+  xmlParts.push(`<show_result>`)
+  xmlParts.push(`  <status>success</status>`)
+  xmlParts.push(`  <change>`)
+  xmlParts.push(`    <id>${escapeXML(changeDetails.id)}</id>`)
+  xmlParts.push(`    <number>${changeDetails.number}</number>`)
+  xmlParts.push(`    <subject><![CDATA[${sanitizeCDATA(changeDetails.subject)}]]></subject>`)
+  xmlParts.push(`    <status>${escapeXML(changeDetails.status)}</status>`)
+  xmlParts.push(`    <project>${escapeXML(changeDetails.project)}</project>`)
+  xmlParts.push(`    <branch>${escapeXML(changeDetails.branch)}</branch>`)
+  xmlParts.push(`    <owner>`)
   if (changeDetails.owner.name) {
-    console.log(`      <name><![CDATA[${sanitizeCDATA(changeDetails.owner.name)}]]></name>`)
+    xmlParts.push(`      <name><![CDATA[${sanitizeCDATA(changeDetails.owner.name)}]]></name>`)
   }
   if (changeDetails.owner.email) {
-    console.log(`      <email>${escapeXML(changeDetails.owner.email)}</email>`)
+    xmlParts.push(`      <email>${escapeXML(changeDetails.owner.email)}</email>`)
   }
-  console.log(`    </owner>`)
-  console.log(`    <created>${escapeXML(changeDetails.created || '')}</created>`)
-  console.log(`    <updated>${escapeXML(changeDetails.updated || '')}</updated>`)
-  console.log(`  </change>`)
-  console.log(`  <diff><![CDATA[${sanitizeCDATA(diff)}]]></diff>`)
+  xmlParts.push(`    </owner>`)
+  xmlParts.push(`    <created>${escapeXML(changeDetails.created || '')}</created>`)
+  xmlParts.push(`    <updated>${escapeXML(changeDetails.updated || '')}</updated>`)
+  xmlParts.push(`  </change>`)
+  xmlParts.push(`  <diff><![CDATA[${sanitizeCDATA(diff)}]]></diff>`)
 
   // Comments section
-  console.log(`  <comments>`)
-  console.log(`    <count>${commentsWithContext.length}</count>`)
+  xmlParts.push(`  <comments>`)
+  xmlParts.push(`    <count>${commentsWithContext.length}</count>`)
   for (const { comment } of commentsWithContext) {
-    console.log(`    <comment>`)
-    if (comment.id) console.log(`      <id>${escapeXML(comment.id)}</id>`)
-    if (comment.path) console.log(`      <path><![CDATA[${sanitizeCDATA(comment.path)}]]></path>`)
-    if (comment.line) console.log(`      <line>${comment.line}</line>`)
+    xmlParts.push(`    <comment>`)
+    if (comment.id) xmlParts.push(`      <id>${escapeXML(comment.id)}</id>`)
+    if (comment.path) xmlParts.push(`      <path><![CDATA[${sanitizeCDATA(comment.path)}]]></path>`)
+    if (comment.line) xmlParts.push(`      <line>${comment.line}</line>`)
     if (comment.author?.name) {
-      console.log(`      <author><![CDATA[${sanitizeCDATA(comment.author.name)}]]></author>`)
+      xmlParts.push(`      <author><![CDATA[${sanitizeCDATA(comment.author.name)}]]></author>`)
     }
-    if (comment.updated) console.log(`      <updated>${escapeXML(comment.updated)}</updated>`)
+    if (comment.updated) xmlParts.push(`      <updated>${escapeXML(comment.updated)}</updated>`)
     if (comment.message) {
-      console.log(`      <message><![CDATA[${sanitizeCDATA(comment.message)}]]></message>`)
+      xmlParts.push(`      <message><![CDATA[${sanitizeCDATA(comment.message)}]]></message>`)
     }
-    if (comment.unresolved) console.log(`      <unresolved>true</unresolved>`)
-    console.log(`    </comment>`)
+    if (comment.unresolved) xmlParts.push(`      <unresolved>true</unresolved>`)
+    xmlParts.push(`    </comment>`)
   }
-  console.log(`  </comments>`)
+  xmlParts.push(`  </comments>`)
 
   // Messages section
-  console.log(`  <messages>`)
-  console.log(`    <count>${messages.length}</count>`)
+  xmlParts.push(`  <messages>`)
+  xmlParts.push(`    <count>${messages.length}</count>`)
   for (const message of messages) {
-    console.log(`    <message>`)
-    console.log(`      <id>${escapeXML(message.id)}</id>`)
+    xmlParts.push(`    <message>`)
+    xmlParts.push(`      <id>${escapeXML(message.id)}</id>`)
     if (message.author?.name) {
-      console.log(`      <author><![CDATA[${sanitizeCDATA(message.author.name)}]]></author>`)
+      xmlParts.push(`      <author><![CDATA[${sanitizeCDATA(message.author.name)}]]></author>`)
     }
     if (message.author?._account_id) {
-      console.log(`      <author_id>${message.author._account_id}</author_id>`)
+      xmlParts.push(`      <author_id>${message.author._account_id}</author_id>`)
     }
-    console.log(`      <date>${escapeXML(message.date)}</date>`)
+    xmlParts.push(`      <date>${escapeXML(message.date)}</date>`)
     if (message._revision_number) {
-      console.log(`      <revision>${message._revision_number}</revision>`)
+      xmlParts.push(`      <revision>${message._revision_number}</revision>`)
     }
     if (message.tag) {
-      console.log(`      <tag>${escapeXML(message.tag)}</tag>`)
+      xmlParts.push(`      <tag>${escapeXML(message.tag)}</tag>`)
     }
-    console.log(`      <message><![CDATA[${sanitizeCDATA(message.message)}]]></message>`)
-    console.log(`    </message>`)
+    xmlParts.push(`      <message><![CDATA[${sanitizeCDATA(message.message)}]]></message>`)
+    xmlParts.push(`    </message>`)
   }
-  console.log(`  </messages>`)
-  console.log(`</show_result>`)
+  xmlParts.push(`  </messages>`)
+  xmlParts.push(`</show_result>`)
+
+  const xmlOutput = xmlParts.join('\n') + '\n'
+  // Write to stdout with proper drain handling for large payloads
+  return new Promise<void>((resolve, reject) => {
+    const written = process.stdout.write(xmlOutput, (err) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+
+    if (!written) {
+      process.stdout.once('drain', resolve)
+      process.stdout.once('error', reject)
+    }
+  })
 }
 
 export const showCommand = (
@@ -358,9 +395,11 @@ export const showCommand = (
 
     // Format output
     if (options.json) {
-      formatShowJson(changeDetails, diff, commentsWithContext, messages)
+      yield* Effect.promise(() =>
+        formatShowJson(changeDetails, diff, commentsWithContext, messages),
+      )
     } else if (options.xml) {
-      formatShowXml(changeDetails, diff, commentsWithContext, messages)
+      yield* Effect.promise(() => formatShowXml(changeDetails, diff, commentsWithContext, messages))
     } else {
       formatShowPretty(changeDetails, diff, commentsWithContext, messages)
     }
@@ -373,22 +412,57 @@ export const showCommand = (
           : String(error)
 
       if (options.json) {
-        console.log(
-          JSON.stringify(
-            {
-              status: 'error',
-              error: errorMessage,
-            },
-            null,
-            2,
-          ),
+        return Effect.promise(
+          () =>
+            new Promise<void>((resolve, reject) => {
+              const errorOutput =
+                JSON.stringify(
+                  {
+                    status: 'error',
+                    error: errorMessage,
+                  },
+                  null,
+                  2,
+                ) + '\n'
+              const written = process.stdout.write(errorOutput, (err) => {
+                if (err) {
+                  reject(err)
+                } else {
+                  resolve()
+                }
+              })
+
+              if (!written) {
+                // Wait for drain if buffer is full
+                process.stdout.once('drain', resolve)
+                process.stdout.once('error', reject)
+              }
+            }),
         )
       } else if (options.xml) {
-        console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-        console.log(`<show_result>`)
-        console.log(`  <status>error</status>`)
-        console.log(`  <error><![CDATA[${sanitizeCDATA(errorMessage)}]]></error>`)
-        console.log(`</show_result>`)
+        return Effect.promise(
+          () =>
+            new Promise<void>((resolve, reject) => {
+              const xmlError =
+                `<?xml version="1.0" encoding="UTF-8"?>\n` +
+                `<show_result>\n` +
+                `  <status>error</status>\n` +
+                `  <error><![CDATA[${sanitizeCDATA(errorMessage)}]]></error>\n` +
+                `</show_result>\n`
+              const written = process.stdout.write(xmlError, (err) => {
+                if (err) {
+                  reject(err)
+                } else {
+                  resolve()
+                }
+              })
+
+              if (!written) {
+                process.stdout.once('drain', resolve)
+                process.stdout.once('error', reject)
+              }
+            }),
+        )
       } else {
         console.error(`✗ Error: ${errorMessage}`)
       }

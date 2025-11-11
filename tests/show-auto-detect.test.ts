@@ -75,6 +75,7 @@ ${JSON.stringify(mockChange)}`)
 
 let capturedLogs: string[] = []
 let capturedErrors: string[] = []
+let capturedStdout: string[] = []
 
 const mockConsoleLog = mock((...args: any[]) => {
   capturedLogs.push(args.join(' '))
@@ -83,8 +84,19 @@ const mockConsoleError = mock((...args: any[]) => {
   capturedErrors.push(args.join(' '))
 })
 
+// Mock process.stdout.write to capture JSON/XML output and handle callbacks
+const mockStdoutWrite = mock((chunk: any, callback?: any) => {
+  capturedStdout.push(String(chunk))
+  // Call the callback synchronously if provided
+  if (typeof callback === 'function') {
+    callback()
+  }
+  return true
+})
+
 const originalConsoleLog = console.log
 const originalConsoleError = console.error
+const originalStdoutWrite = process.stdout.write
 
 let spawnSpy: ReturnType<typeof spyOn>
 
@@ -94,20 +106,26 @@ beforeAll(() => {
   console.log = mockConsoleLog
   // @ts-ignore
   console.error = mockConsoleError
+  // @ts-ignore
+  process.stdout.write = mockStdoutWrite
 })
 
 afterAll(() => {
   server.close()
   console.log = originalConsoleLog
   console.error = originalConsoleError
+  // @ts-ignore
+  process.stdout.write = originalStdoutWrite
 })
 
 afterEach(() => {
   server.resetHandlers()
   mockConsoleLog.mockClear()
   mockConsoleError.mockClear()
+  mockStdoutWrite.mockClear()
   capturedLogs = []
   capturedErrors = []
+  capturedStdout = []
 
   if (spawnSpy) {
     spawnSpy.mockRestore()
@@ -184,7 +202,7 @@ Change-Id: If5a3ae8cb5a107e187447802358417f311d0c4b1`
 
     await resultPromise
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
     expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(output).toContain('<show_result>')
     expect(output).toContain('<status>success</status>')
@@ -297,7 +315,7 @@ This commit has no Change-ID footer.`
 
     await resultPromise
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
     expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(output).toContain('<show_result>')
     expect(output).toContain('<status>error</status>')

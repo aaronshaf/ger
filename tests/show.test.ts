@@ -27,6 +27,7 @@ const server = setupServer(
 // Store captured output
 let capturedLogs: string[] = []
 let capturedErrors: string[] = []
+let capturedStdout: string[] = []
 
 // Mock console.log and console.error
 const mockConsoleLog = mock((...args: any[]) => {
@@ -36,9 +37,20 @@ const mockConsoleError = mock((...args: any[]) => {
   capturedErrors.push(args.join(' '))
 })
 
-// Store original console methods
+// Mock process.stdout.write to capture JSON output and handle callbacks
+const mockStdoutWrite = mock((chunk: any, callback?: any) => {
+  capturedStdout.push(String(chunk))
+  // Call the callback synchronously if provided
+  if (typeof callback === 'function') {
+    callback()
+  }
+  return true
+})
+
+// Store original methods
 const originalConsoleLog = console.log
 const originalConsoleError = console.error
+const originalStdoutWrite = process.stdout.write
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'bypass' })
@@ -46,20 +58,26 @@ beforeAll(() => {
   console.log = mockConsoleLog
   // @ts-ignore
   console.error = mockConsoleError
+  // @ts-ignore
+  process.stdout.write = mockStdoutWrite
 })
 
 afterAll(() => {
   server.close()
   console.log = originalConsoleLog
   console.error = originalConsoleError
+  // @ts-ignore
+  process.stdout.write = originalStdoutWrite
 })
 
 afterEach(() => {
   server.resetHandlers()
   mockConsoleLog.mockClear()
   mockConsoleError.mockClear()
+  mockStdoutWrite.mockClear()
   capturedLogs = []
   capturedErrors = []
+  capturedStdout = []
 })
 
 describe('show command', () => {
@@ -201,7 +219,7 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
 
     expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(output).toContain('<show_result>')
@@ -258,7 +276,7 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
 
     expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(output).toContain('<show_result>')
@@ -301,7 +319,7 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
 
     expect(output).toContain('<subject><![CDATA[Fix "quotes" & <tags> in auth]]></subject>')
     expect(output).toContain('<branch>feature/fix&amp;improve</branch>')
@@ -450,7 +468,7 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
 
     // Parse JSON to verify it's valid
     const parsed = JSON.parse(output)
@@ -495,7 +513,7 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
 
     // Parse JSON to verify it's valid
     const parsed = JSON.parse(output)
@@ -516,7 +534,7 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
 
     // Extract comment sections to verify order
     const commentMatches = output.matchAll(
@@ -581,7 +599,7 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    const output = capturedLogs.join('\n')
+    const output = capturedStdout.join('')
     const parsed = JSON.parse(output)
 
     expect(parsed.messages).toBeDefined()
@@ -591,5 +609,205 @@ describe('show command', () => {
     expect(parsed.messages[0].message).toContain('https://jenkins.example.com')
     expect(parsed.messages[0].author.name).toBe('Jenkins Bot')
     expect(parsed.messages[0].revision).toBe(2)
+  })
+
+  test('should handle large JSON output without truncation', async () => {
+    // Create a large diff to simulate output > 64KB
+    const largeDiff = '--- a/large-file.js\n+++ b/large-file.js\n' + 'x'.repeat(100000)
+
+    const mockChange = generateMockChange({
+      _number: 12345,
+      subject: 'Large change with extensive diff',
+    })
+
+    // Create many comments to increase JSON size
+    const manyComments: Record<string, any[]> = {
+      'src/file.js': Array.from({ length: 100 }, (_, i) => ({
+        id: `comment${i}`,
+        path: 'src/file.js',
+        line: i + 1,
+        message: `Comment ${i}: ${'a'.repeat(500)}`, // Make comments substantial
+        author: {
+          name: 'Reviewer',
+          email: 'reviewer@example.com',
+        },
+        updated: '2024-01-15 11:30:00.000000000',
+        unresolved: false,
+      })),
+    }
+
+    server.use(
+      http.get('*/a/changes/:changeId', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChange)}`)
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/patch', () => {
+        return HttpResponse.text(btoa(largeDiff))
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/comments', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(manyComments)}`)
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/files/:fileName/diff', () => {
+        return HttpResponse.text('context')
+      }),
+    )
+
+    const mockConfigLayer = createMockConfigLayer()
+    const program = showCommand('12345', { json: true }).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    const output = capturedStdout.join('')
+
+    // Verify output is larger than 64KB (the previous truncation point)
+    expect(output.length).toBeGreaterThan(65536)
+
+    // Verify JSON is valid and complete
+    const parsed = JSON.parse(output)
+    expect(parsed.status).toBe('success')
+    expect(parsed.diff).toContain('x'.repeat(100000))
+    expect(parsed.comments.length).toBe(100)
+
+    // Verify last comment is present (proves no truncation)
+    const lastComment = parsed.comments[parsed.comments.length - 1]
+    expect(lastComment.message).toContain('Comment 99')
+  })
+
+  test('should handle stdout drain event when buffer is full', async () => {
+    setupMockHandlers()
+
+    // Store original stdout.write
+    const originalStdoutWrite = process.stdout.write
+
+    let drainCallback: (() => void) | null = null
+    let errorCallback: ((err: Error) => void) | null = null
+    let writeCallbackFn: ((err?: Error) => void) | null = null
+
+    // Mock stdout.write to simulate full buffer
+    const mockWrite = mock((chunk: any, callback?: any) => {
+      capturedStdout.push(String(chunk))
+      writeCallbackFn = callback
+      // Return false to simulate full buffer
+      return false
+    })
+
+    // Mock stdout.once to capture drain and error listeners
+    const mockOnce = mock((event: string, callback: any) => {
+      if (event === 'drain') {
+        drainCallback = callback
+        // Simulate drain event after a short delay
+        setTimeout(() => {
+          if (drainCallback) {
+            drainCallback()
+            if (writeCallbackFn) {
+              writeCallbackFn()
+            }
+          }
+        }, 10)
+      } else if (event === 'error') {
+        errorCallback = callback
+      }
+      return process.stdout
+    })
+
+    // Apply mocks
+    // @ts-ignore
+    process.stdout.write = mockWrite
+    // @ts-ignore
+    process.stdout.once = mockOnce
+
+    const mockConfigLayer = createMockConfigLayer()
+    const program = showCommand('12345', { json: true }).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    // Restore original stdout.write
+    // @ts-ignore
+    process.stdout.write = originalStdoutWrite
+
+    // Verify that write returned false (buffer full)
+    expect(mockWrite).toHaveBeenCalled()
+
+    // Verify that drain listener was registered
+    expect(mockOnce).toHaveBeenCalledWith('drain', expect.any(Function))
+
+    // Verify that error listener was registered for robustness
+    expect(mockOnce).toHaveBeenCalledWith('error', expect.any(Function))
+
+    // Verify output is still valid JSON despite drain handling
+    const output = capturedStdout.join('')
+    const parsed = JSON.parse(output)
+    expect(parsed.status).toBe('success')
+    expect(parsed.change.id).toBe('I123abc456def')
+  })
+
+  test('should handle large XML output without truncation', async () => {
+    // Create a large diff to simulate output > 64KB
+    const largeDiff = '--- a/large-file.js\n+++ b/large-file.js\n' + 'x'.repeat(100000)
+
+    const mockChange = generateMockChange({
+      _number: 12345,
+      subject: 'Large change with extensive diff',
+    })
+
+    // Create many comments to increase XML size
+    const manyComments: Record<string, any[]> = {
+      'src/file.js': Array.from({ length: 100 }, (_, i) => ({
+        id: `comment${i}`,
+        path: 'src/file.js',
+        line: i + 1,
+        message: `Comment ${i}: ${'a'.repeat(500)}`,
+        author: {
+          name: 'Reviewer',
+          email: 'reviewer@example.com',
+        },
+        updated: '2024-01-15 11:30:00.000000000',
+        unresolved: false,
+      })),
+    }
+
+    server.use(
+      http.get('*/a/changes/:changeId', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChange)}`)
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/patch', () => {
+        return HttpResponse.text(btoa(largeDiff))
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/comments', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(manyComments)}`)
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/files/:fileName/diff', () => {
+        return HttpResponse.text('context')
+      }),
+    )
+
+    const mockConfigLayer = createMockConfigLayer()
+    const program = showCommand('12345', { xml: true }).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    const output = capturedStdout.join('')
+
+    // Verify output is larger than 64KB
+    expect(output.length).toBeGreaterThan(65536)
+
+    // Verify XML is valid and complete
+    expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+    expect(output).toContain('<show_result>')
+    expect(output).toContain('<status>success</status>')
+    expect(output).toContain('x'.repeat(100000))
+    expect(output).toContain('<count>100</count>')
+    expect(output).toContain('</show_result>')
+
+    // Verify last comment is present (proves no truncation)
+    expect(output).toContain('Comment 99')
   })
 })
