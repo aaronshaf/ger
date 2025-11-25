@@ -55,6 +55,10 @@ ger diff 12345
 # Extract URLs from messages (e.g., Jenkins build links)
 ger extract-url "build-summary-report" | tail -1
 
+# Check CI build status (parses build messages)
+ger build-status 12345  # Returns: pending, running, success, failure, or not_found
+ger build-status        # Auto-detects from HEAD commit
+
 # AI-powered code review (requires claude, llm, or opencode CLI)
 ger review 12345
 ger review 12345 --dry-run  # Preview without posting
@@ -248,6 +252,51 @@ ger extract-url "github.com" --include-comments
 # Extract specific build job URLs with regex
 ger extract-url "job/[^/]+/job/[^/]+/\d+/$" --regex
 ```
+
+### Build Status
+
+Check the CI build status of a change by parsing Gerrit messages for build events and verification results:
+
+```bash
+# Check build status for a specific change
+ger build-status 12345
+
+# Auto-detect change from HEAD commit
+ger build-status
+
+# Use in scripts with jq
+ger build-status | jq -r '.state'
+
+# Wait for build completion in CI scripts
+while [ "$(ger build-status | jq -r '.state')" = "running" ]; do
+  echo "Waiting for build..."
+  sleep 30
+done
+```
+
+#### Output format (JSON):
+```json
+{"state": "success"}
+```
+
+#### Build states:
+- **`pending`**: No "Build Started" message found yet
+- **`running`**: "Build Started" found, but no verification result yet
+- **`success`**: Verified +1 after most recent "Build Started"
+- **`failure`**: Verified -1 after most recent "Build Started"
+- **`not_found`**: Change does not exist
+
+#### How it works:
+1. Fetches all messages for the change
+2. Finds the most recent "Build Started" message
+3. Checks for "Verified +1" or "Verified -1" messages after the build started
+4. Returns the appropriate state
+
+#### Use cases:
+- **CI/CD integration**: Wait for builds before proceeding with deployment
+- **Automation**: Trigger actions based on build results
+- **Scripting**: Check build status in shell scripts
+- **Monitoring**: Poll build status for long-running builds
 
 ### Diff
 ```bash
