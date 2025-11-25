@@ -31,6 +31,7 @@ import { ConfigServiceLive } from '@/services/config'
 import { ReviewStrategyServiceLive } from '@/services/review-strategy'
 import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { abandonCommand } from './commands/abandon'
+import { buildStatusCommand } from './commands/build-status'
 import { commentCommand } from './commands/comment'
 import { commentsCommand } from './commands/comments'
 import { diffCommand } from './commands/diff'
@@ -416,6 +417,63 @@ Note: When no change-id is provided, it will be automatically extracted from the
         console.error('✗ Error:', errorMessage)
       }
       process.exit(1)
+    }
+  })
+
+// build-status command
+program
+  .command('build-status [change-id]')
+  .description(
+    'Check build status from Gerrit messages (auto-detects from HEAD commit if not specified)',
+  )
+  .addHelpText(
+    'after',
+    `
+This command parses Gerrit change messages to determine build status.
+It looks for "Build Started" messages and subsequent verification labels.
+
+Output is JSON with a "state" field that can be:
+  - pending: No build has started yet
+  - running: Build started but no verification yet
+  - success: Build completed with Verified+1
+  - failure: Build completed with Verified-1
+  - not_found: Change does not exist
+
+Examples:
+  # Check build status for specific change (using change number)
+  $ ger build-status 392385
+  {"state":"success"}
+
+  # Check build status for specific change (using Change-ID)
+  $ ger build-status If5a3ae8cb5a107e187447802358417f311d0c4b1
+  {"state":"running"}
+
+  # Auto-detect from HEAD commit
+  $ ger build-status
+  {"state":"pending"}
+
+  # Use in scripts (exit code 0 on success, 1 on error)
+  $ if ger build-status | jq -e '.state == "success"' > /dev/null; then
+      echo "Build passed!"
+    fi
+
+Note: When no change-id is provided, it will be automatically extracted from the
+      Change-ID footer in your HEAD commit.`,
+  )
+  .action(async (changeId) => {
+    try {
+      const effect = buildStatusCommand(changeId).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(ConfigServiceLive),
+      )
+      await Effect.runPromise(effect)
+    } catch (error) {
+      // Errors are handled within the command itself
+      // This catch is just for any unexpected errors
+      if (error instanceof Error && error.message !== 'Process exited') {
+        console.error('✗ Unexpected error:', error.message)
+        process.exit(1)
+      }
     }
   })
 
