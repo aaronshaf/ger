@@ -1,26 +1,48 @@
-import { describe, test, expect, beforeEach } from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, mock, test } from 'bun:test'
 import { Effect, Layer } from 'effect'
+import { HttpResponse, http } from 'msw'
+import { setupServer } from 'msw/node'
+import { GerritApiServiceLive } from '@/api/gerrit'
 import { mineCommand } from '@/cli/commands/mine'
-import { GerritApiService, type ApiError } from '@/api/gerrit'
+import { ConfigService } from '@/services/config'
 import { generateMockChange } from '@/test-utils/mock-generator'
 import type { ChangeInfo } from '@/schemas/gerrit'
+import { createMockConfigService } from './helpers/config-mock'
 
-// Mock console.log to capture output
-const mockConsole = {
-  logs: [] as string[],
-  log: function (message: string) {
-    this.logs.push(message)
-  },
-  clear: function () {
-    this.logs = []
-  },
-}
+// Create MSW server
+const server = setupServer(
+  // Default handler for auth check
+  http.get('*/a/accounts/self', ({ request }) => {
+    const auth = request.headers.get('Authorization')
+    if (!auth || !auth.startsWith('Basic ')) {
+      return HttpResponse.text('Unauthorized', { status: 401 })
+    }
+    return HttpResponse.json({
+      _account_id: 1000,
+      name: 'Test User',
+      email: 'test@example.com',
+    })
+  }),
+)
 
 describe('mine command', () => {
+  let mockConsoleLog: ReturnType<typeof mock>
+
+  beforeAll(() => {
+    server.listen({ onUnhandledRequest: 'bypass' })
+  })
+
+  afterAll(() => {
+    server.close()
+  })
+
   beforeEach(() => {
-    mockConsole.clear()
-    // Replace console.log for tests
-    global.console.log = mockConsole.log.bind(mockConsole)
+    mockConsoleLog = mock(() => {})
+    console.log = mockConsoleLog
+  })
+
+  afterEach(() => {
+    server.resetHandlers()
   })
 
   test('should fetch and display my changes in pretty format', async () => {
@@ -41,32 +63,26 @@ describe('mine command', () => {
       }),
     ]
 
-    const mockApi = GerritApiService.of({
-      listChanges: (query?: string) => {
-        expect(query).toBe('owner:self status:open')
-        return Effect.succeed(mockChanges)
-      },
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
-
-    await Effect.runPromise(
-      mineCommand({ xml: false }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+    server.use(
+      http.get('*/a/changes/', ({ request }) => {
+        const url = new URL(request.url)
+        expect(url.searchParams.get('q')).toBe('owner:self status:open')
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChanges)}`)
+      }),
     )
 
-    expect(mockConsole.logs.length).toBeGreaterThan(0)
-    expect(mockConsole.logs.some((log) => log.includes('My test change'))).toBe(true)
-    expect(mockConsole.logs.some((log) => log.includes('Another change'))).toBe(true)
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    await Effect.runPromise(
+      mineCommand({ xml: false }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
+    )
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output.length).toBeGreaterThan(0)
+    expect(output).toContain('My test change')
+    expect(output).toContain('Another change')
   })
 
   test('should output XML format when --xml flag is used', async () => {
@@ -80,30 +96,23 @@ describe('mine command', () => {
       }),
     ]
 
-    const mockApi = GerritApiService.of({
-      listChanges: (query?: string) => {
-        expect(query).toBe('owner:self status:open')
-        return Effect.succeed(mockChanges)
-      },
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
-
-    await Effect.runPromise(
-      mineCommand({ xml: true }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+    server.use(
+      http.get('*/a/changes/', ({ request }) => {
+        const url = new URL(request.url)
+        expect(url.searchParams.get('q')).toBe('owner:self status:open')
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChanges)}`)
+      }),
     )
 
-    const output = mockConsole.logs.join('\n')
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    await Effect.runPromise(
+      mineCommand({ xml: true }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
+    )
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
     expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(output).toContain('<changes count="1">')
     expect(output).toContain('<change>')
@@ -117,113 +126,83 @@ describe('mine command', () => {
   })
 
   test('should handle no changes gracefully', async () => {
-    const mockApi = GerritApiService.of({
-      listChanges: () => Effect.succeed([]),
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text(")]}'\n[]")
+      }),
+    )
 
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
     await Effect.runPromise(
-      mineCommand({ xml: false }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+      mineCommand({ xml: false }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
     )
 
     // Mine command returns early for empty results, so no output is expected
-    expect(mockConsole.logs).toEqual([])
+    expect(mockConsoleLog.mock.calls).toEqual([])
   })
 
   test('should handle no changes gracefully in XML format', async () => {
-    const mockApi = GerritApiService.of({
-      listChanges: () => Effect.succeed([]),
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
-
-    await Effect.runPromise(
-      mineCommand({ xml: true }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text(")]}'\n[]")
+      }),
     )
 
-    const output = mockConsole.logs.join('\n')
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    await Effect.runPromise(
+      mineCommand({ xml: true }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
+    )
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
     expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(output).toContain('<changes count="0">')
     expect(output).toContain('</changes>')
   })
 
   test('should handle network failures gracefully', async () => {
-    const mockApi = GerritApiService.of({
-      listChanges: () => Effect.fail(new Error('Network error') as ApiError),
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text('Network error', { status: 500 })
+      }),
+    )
 
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
     const result = await Effect.runPromise(
       Effect.either(
-        mineCommand({ xml: false }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+        mineCommand({ xml: false }).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(mockConfigLayer),
+        ),
       ),
     )
 
     expect(result._tag).toBe('Left')
-    if (result._tag === 'Left') {
-      expect(result.left.message).toBe('Network error')
-    }
   })
 
   test('should handle network failures gracefully in XML format', async () => {
-    const mockApi = GerritApiService.of({
-      listChanges: () => Effect.fail(new Error('API error') as ApiError),
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text('API error', { status: 500 })
+      }),
+    )
 
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
     const result = await Effect.runPromise(
       Effect.either(
-        mineCommand({ xml: true }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+        mineCommand({ xml: true }).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(mockConfigLayer),
+        ),
       ),
     )
 
     expect(result._tag).toBe('Left')
-    if (result._tag === 'Left') {
-      expect(result.left.message).toBe('API error')
-    }
   })
 
   test('should properly escape XML special characters', async () => {
@@ -237,27 +216,21 @@ describe('mine command', () => {
       }),
     ]
 
-    const mockApi = GerritApiService.of({
-      listChanges: () => Effect.succeed(mockChanges),
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
-
-    await Effect.runPromise(
-      mineCommand({ xml: true }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChanges)}`)
+      }),
     )
 
-    const output = mockConsole.logs.join('\n')
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    await Effect.runPromise(
+      mineCommand({ xml: true }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
+    )
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
     // CDATA sections should preserve special characters
     expect(output).toContain('<![CDATA[Test with <special> & "characters"]]>')
     expect(output).toContain('<branch>feature/test&update</branch>')
@@ -288,27 +261,21 @@ describe('mine command', () => {
       }),
     ]
 
-    const mockApi = GerritApiService.of({
-      listChanges: () => Effect.succeed(mockChanges),
-      getChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      postReview: () => Effect.fail(new Error('Not implemented') as ApiError),
-      abandonChange: () => Effect.fail(new Error('Not implemented') as ApiError),
-      testConnection: Effect.fail(new Error('Not implemented') as ApiError),
-      getRevision: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFiles: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getFileContent: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getPatch: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getDiff: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getComments: () => Effect.fail(new Error('Not implemented') as ApiError),
-      getMessages: () => Effect.fail(new Error('Not implemented') as ApiError),
-    })
-
-    await Effect.runPromise(
-      mineCommand({ xml: false }).pipe(Effect.provide(Layer.succeed(GerritApiService, mockApi))),
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChanges)}`)
+      }),
     )
 
-    const output = mockConsole.logs.join('\n')
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    await Effect.runPromise(
+      mineCommand({ xml: false }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
+    )
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
     expect(output).toContain('Change in project A')
     expect(output).toContain('Change in project B')
     expect(output).toContain('Another change in project A')

@@ -25,10 +25,10 @@
 ### Testing & Coverage
 - **ENFORCE** minimum 80% code coverage
 - **RUN** all tests in pre-commit and pre-push hooks
-- **USE** Bun's native fetch mocking for all HTTP requests
+- **USE** MSW (Mock Service Worker) for all HTTP request mocking
 - **REQUIRE** meaningful integration tests for all commands that simulate full workflows
 - **IMPLEMENT** both unit tests and integration tests for every command modification/addition
-- **ENSURE** integration tests use realistic Bun HTTP mocks that match Gerrit API responses
+- **ENSURE** integration tests use realistic MSW handlers that match Gerrit API responses
 - **EXCLUDE** generated code and tmp/ from coverage
 
 ### Security
@@ -56,7 +56,7 @@
 ### Testing Requirements for Commands
 - **UNIT TESTS**: Test individual functions, schemas, and utilities
 - **INTEGRATION TESTS**: Test complete command flows with mocked HTTP requests
-- **HTTP MOCKING**: Use `global.fetch = mock(...)` pattern with Bun's native mocking
+- **HTTP MOCKING**: Use MSW handlers with http.get/http.post patterns for mocking
 - **SCHEMA VALIDATION**: Ensure mocks return data that validates against Effect Schemas
 - **COMMAND COVERAGE**: Every command must have integration tests covering:
   - Happy path execution

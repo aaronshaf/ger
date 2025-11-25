@@ -1,4 +1,11 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test'
+import { Effect, Layer } from 'effect'
+import { HttpResponse, http } from 'msw'
+import { setupServer } from 'msw/node'
+import { GerritApiServiceLive } from '@/api/gerrit'
+import { abandonCommand } from '@/cli/commands/abandon'
+import { ConfigService } from '@/services/config'
+import { createMockConfigService } from './helpers/config-mock'
 import type { ChangeInfo } from '@/schemas/gerrit'
 
 const mockChange: ChangeInfo = {
@@ -28,136 +35,196 @@ const mockChange: ChangeInfo = {
   submittable: false,
 }
 
+// Create MSW server
+const server = setupServer(
+  // Default handler for auth check
+  http.get('*/a/accounts/self', ({ request }) => {
+    const auth = request.headers.get('Authorization')
+    if (!auth || !auth.startsWith('Basic ')) {
+      return HttpResponse.text('Unauthorized', { status: 401 })
+    }
+    return HttpResponse.json({
+      _account_id: 1000,
+      name: 'Test User',
+      email: 'test@example.com',
+    })
+  }),
+)
+
 describe('abandon command', () => {
-  let mockFetch: ReturnType<typeof mock>
+  let mockConsoleLog: ReturnType<typeof mock>
+  let mockConsoleError: ReturnType<typeof mock>
+
+  beforeAll(() => {
+    server.listen({ onUnhandledRequest: 'bypass' })
+  })
+
+  afterAll(() => {
+    server.close()
+  })
 
   beforeEach(() => {
-    // Reset fetch mock for each test
-    mockFetch = mock(() =>
-      Promise.resolve({
-        ok: true,
-        status: 200,
-        text: () => Promise.resolve(')]}\n{}'),
+    mockConsoleLog = mock(() => {})
+    mockConsoleError = mock(() => {})
+    console.log = mockConsoleLog
+    console.error = mockConsoleError
+  })
+
+  afterEach(() => {
+    server.resetHandlers()
+  })
+
+  it('should abandon a change with a message', async () => {
+    server.use(
+      http.get('*/a/changes/12345', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChange)}`)
+      }),
+      http.post('*/a/changes/12345/abandon', async ({ request }) => {
+        const body = (await request.json()) as { message?: string }
+        expect(body.message).toBe('No longer needed')
+        return HttpResponse.text(")]}'\n{}")
       }),
     )
-    global.fetch = mockFetch as unknown as typeof fetch
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = abandonCommand('12345', {
+      message: 'No longer needed',
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    await Effect.runPromise(program)
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('Abandoned change 12345')
+    expect(output).toContain('Test change to abandon')
+    expect(output).toContain('Message: No longer needed')
   })
 
-  it('should call abandon API endpoint with correct parameters', async () => {
-    // Mock successful responses
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        text: async () => `)]}'
-{
-  "id": "test-project~master~I123",
-  "project": "test-project",
-  "branch": "master",
-  "change_id": "I123",
-  "subject": "Test change to abandon",
-  "status": "NEW",
-  "_number": 12345
-}`,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        text: async () => ')]}\n{}',
-      })
+  it('should abandon a change without a message', async () => {
+    server.use(
+      http.get('*/a/changes/12345', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChange)}`)
+      }),
+      http.post('*/a/changes/12345/abandon', async ({ request }) => {
+        const body = (await request.json()) as { message?: string }
+        expect(body.message).toBeUndefined()
+        return HttpResponse.text(")]}'\n{}")
+      }),
+    )
 
-    // Note: This is a unit test demonstrating the API calls
-    // Actual integration would require running the full command
-    // which we avoid to prevent hitting production
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = abandonCommand('12345', {}).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
 
-    // Verify the mock setup
-    const response = await mockFetch('https://test.gerrit.com/a/changes/12345')
-    const text = await response.text()
-    expect(text).toContain('Test change to abandon')
+    await Effect.runPromise(program)
 
-    // Verify abandon endpoint would be called
-    const abandonResponse = await mockFetch('https://test.gerrit.com/a/changes/12345/abandon', {
-      method: 'POST',
-      body: JSON.stringify({ message: 'No longer needed' }),
-    })
-    expect(abandonResponse.ok).toBe(true)
-
-    // Verify calls were made
-    expect(mockFetch).toHaveBeenCalledTimes(2)
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('Abandoned change 12345')
+    expect(output).toContain('Test change to abandon')
+    expect(output).not.toContain('Message:')
   })
 
-  it('should handle abandon without message', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => ')]}\n{}',
-    })
+  it('should output XML format when --xml flag is used', async () => {
+    server.use(
+      http.get('*/a/changes/12345', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChange)}`)
+      }),
+      http.post('*/a/changes/12345/abandon', async ({ request }) => {
+        const body = (await request.json()) as { message?: string }
+        expect(body.message).toBe('Abandoning for testing')
+        return HttpResponse.text(")]}'\n{}")
+      }),
+    )
 
-    const response = await mockFetch('https://test.gerrit.com/a/changes/12345/abandon', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    })
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = abandonCommand('12345', {
+      xml: true,
+      message: 'Abandoning for testing',
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
 
-    expect(response.ok).toBe(true)
-    expect(mockFetch).toHaveBeenCalledWith('https://test.gerrit.com/a/changes/12345/abandon', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    })
+    await Effect.runPromise(program)
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+    expect(output).toContain('<abandon_result>')
+    expect(output).toContain('<status>success</status>')
+    expect(output).toContain('<change_number>12345</change_number>')
+    expect(output).toContain('<subject><![CDATA[Test change to abandon]]></subject>')
+    expect(output).toContain('<message><![CDATA[Abandoning for testing]]></message>')
+    expect(output).toContain('</abandon_result>')
   })
 
-  it('should handle API errors', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      text: async () => 'Change not found',
-    })
+  it('should output XML format without message when no message provided', async () => {
+    server.use(
+      http.get('*/a/changes/12345', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChange)}`)
+      }),
+      http.post('*/a/changes/12345/abandon', async () => {
+        return HttpResponse.text(")]}'\n{}")
+      }),
+    )
 
-    const response = await mockFetch('https://test.gerrit.com/a/changes/99999/abandon')
-    expect(response.ok).toBe(false)
-    expect(response.status).toBe(404)
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = abandonCommand('12345', { xml: true }).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
 
-    const errorText = await response.text()
-    expect(errorText).toBe('Change not found')
+    await Effect.runPromise(program)
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('<abandon_result>')
+    expect(output).toContain('<status>success</status>')
+    expect(output).not.toContain('<message>')
   })
 
-  it('should format message correctly in request body', () => {
-    const testCases = [
-      { input: undefined, expected: {} },
-      { input: '', expected: {} },
-      { input: 'Abandoning this change', expected: { message: 'Abandoning this change' } },
-      { input: 'Multi\nline\nmessage', expected: { message: 'Multi\nline\nmessage' } },
-    ]
+  it('should handle not found errors gracefully', async () => {
+    server.use(
+      http.get('*/a/changes/99999', () => {
+        return HttpResponse.text('Change not found', { status: 404 })
+      }),
+    )
 
-    for (const testCase of testCases) {
-      const body = testCase.input ? { message: testCase.input } : {}
-      expect(body).toEqual(testCase.expected)
-    }
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = abandonCommand('99999', {
+      message: 'Test message',
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    // Should fail when change is not found
+    await expect(Effect.runPromise(program)).rejects.toThrow()
   })
 
-  describe('interactive mode API patterns', () => {
-    it('should fetch changes for interactive mode', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        text: async () => `)]}'\n[${JSON.stringify(mockChange)}]`,
-      })
+  it('should show error when change ID is not provided', async () => {
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = abandonCommand(undefined, {}).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
 
-      // Test the API call pattern for interactive mode
-      const response = await mockFetch(
-        'https://test.gerrit.com/a/changes/?q=owner:self+status:open',
-      )
-      const text = await response.text()
-      expect(text).toContain('Test change to abandon')
-    })
+    await Effect.runPromise(program)
 
-    it('should handle empty changes list response', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        text: async () => ")]}'\n[]",
-      })
+    const errorOutput = mockConsoleError.mock.calls.map((call) => call[0]).join('\n')
+    expect(errorOutput).toContain('Change ID is required')
+    expect(errorOutput).toContain('Usage: ger abandon <change-id>')
+  })
 
-      const response = await mockFetch(
-        'https://test.gerrit.com/a/changes/?q=owner:self+status:open',
-      )
-      const text = await response.text()
-      const parsed = JSON.parse(text.replace(")]}'\n", ''))
-      expect(parsed).toEqual([])
-    })
+  it('should handle abandon API failure', async () => {
+    server.use(
+      http.get('*/a/changes/12345', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChange)}`)
+      }),
+      http.post('*/a/changes/12345/abandon', () => {
+        return HttpResponse.text('Forbidden', { status: 403 })
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = abandonCommand('12345', {
+      message: 'Test',
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    // Should throw/fail
+    await expect(Effect.runPromise(program)).rejects.toThrow()
   })
 })
