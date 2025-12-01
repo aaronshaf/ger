@@ -59,6 +59,10 @@ ger extract-url "build-summary-report" | tail -1
 ger build-status 12345  # Returns: pending, running, success, failure, or not_found
 ger build-status        # Auto-detects from HEAD commit
 
+# Watch build status until completion (like gh run watch)
+ger build-status 12345 --watch
+ger build-status --watch --exit-status && deploy.sh
+
 # AI-powered code review (requires claude, llm, or opencode CLI)
 ger review 12345
 ger review 12345 --dry-run  # Preview without posting
@@ -257,21 +261,48 @@ ger extract-url "job/[^/]+/job/[^/]+/\d+/$" --regex
 
 Check the CI build status of a change by parsing Gerrit messages for build events and verification results:
 
+#### Single Check (Snapshot)
 ```bash
 # Check build status for a specific change
 ger build-status 12345
+# Output: {"state":"success"}
 
 # Auto-detect change from HEAD commit
 ger build-status
 
 # Use in scripts with jq
 ger build-status | jq -r '.state'
+```
 
-# Wait for build completion in CI scripts
-while [ "$(ger build-status | jq -r '.state')" = "running" ]; do
-  echo "Waiting for build..."
-  sleep 30
-done
+#### Watch Mode (Poll Until Completion)
+Like `gh run watch`, you can poll the build status until it reaches a terminal state:
+
+```bash
+# Watch until completion (outputs JSON on each poll)
+ger build-status 12345 --watch
+# Output:
+# {"state":"pending"}
+# {"state":"running"}
+# {"state":"running"}
+# {"state":"success"}
+
+# Auto-detect from HEAD commit
+ger build-status --watch
+
+# Custom polling interval (check every 5 seconds, default: 10)
+ger build-status --watch --interval 5
+
+# Custom timeout (60 minutes, default: 30 minutes)
+ger build-status --watch --timeout 3600
+
+# Exit with code 1 on build failure (for CI/CD pipelines)
+ger build-status --watch --exit-status && deploy.sh
+
+# Trigger notification when done (like gh run watch pattern)
+ger build-status --watch && notify-send 'Build is done!'
+
+# Extract final state in scripts
+ger build-status --watch | tail -1 | jq -r '.state'
 ```
 
 #### Output format (JSON):
@@ -286,17 +317,24 @@ done
 - **`failure`**: Verified -1 after most recent "Build Started"
 - **`not_found`**: Change does not exist
 
+#### Exit codes:
+- **`0`**: Default for all states (like `gh run watch`)
+- **`1`**: Only when `--exit-status` flag is used AND build fails
+- **`2`**: Timeout reached in watch mode
+- **`3`**: API/network errors
+
 #### How it works:
 1. Fetches all messages for the change
 2. Finds the most recent "Build Started" message
 3. Checks for "Verified +1" or "Verified -1" messages after the build started
 4. Returns the appropriate state
+5. In watch mode: polls every N seconds until terminal state or timeout
 
 #### Use cases:
 - **CI/CD integration**: Wait for builds before proceeding with deployment
 - **Automation**: Trigger actions based on build results
 - **Scripting**: Check build status in shell scripts
-- **Monitoring**: Poll build status for long-running builds
+- **Monitoring**: Poll build status for long-running builds with watch mode
 
 ### Diff
 ```bash

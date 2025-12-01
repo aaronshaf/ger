@@ -1,84 +1,33 @@
-import { describe, test, expect, beforeAll, afterAll, afterEach, mock } from 'bun:test'
-import { setupServer } from 'msw/node'
+import { describe, test, expect, beforeAll, afterAll, afterEach } from 'bun:test'
 import { http, HttpResponse } from 'msw'
-import { Effect, Layer } from 'effect'
+import { Effect } from 'effect'
 import { buildStatusCommand } from '@/cli/commands/build-status'
 import { GerritApiServiceLive } from '@/api/gerrit'
-import { ConfigService } from '@/services/config'
 import type { MessageInfo } from '@/schemas/gerrit'
-import { createMockConfigService } from './helpers/config-mock'
-
-const server = setupServer(
-  // Default handler for auth check
-  http.get('*/a/accounts/self', ({ request }) => {
-    const auth = request.headers.get('Authorization')
-    if (!auth || !auth.startsWith('Basic ')) {
-      return HttpResponse.text('Unauthorized', { status: 401 })
-    }
-    return HttpResponse.json({
-      _account_id: 1000,
-      name: 'Test User',
-      email: 'test@example.com',
-    })
-  }),
-)
-
-// Store captured output
-let capturedStdout: string[] = []
-let capturedErrors: string[] = []
-
-// Mock process.stdout.write to capture JSON output
-const mockStdoutWrite = mock((chunk: any) => {
-  capturedStdout.push(String(chunk))
-  return true
-})
-
-// Mock console.error to capture errors
-const mockConsoleError = mock((...args: any[]) => {
-  capturedErrors.push(args.join(' '))
-})
-
-// Mock process.exit to prevent test termination
-const mockProcessExit = mock((_code?: number) => {
-  throw new Error('Process exited')
-})
-
-// Store original methods
-const originalStdoutWrite = process.stdout.write
-const originalConsoleError = console.error
-const originalProcessExit = process.exit
+import {
+  server,
+  capturedStdout,
+  capturedErrors,
+  mockProcessExit,
+  setupBuildStatusTests,
+  teardownBuildStatusTests,
+  resetBuildStatusMocks,
+  createMockConfigLayer,
+} from './helpers/build-status-test-setup'
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'bypass' })
-  // @ts-ignore - Mocking stdout
-  process.stdout.write = mockStdoutWrite
-  // @ts-ignore - Mocking console
-  console.error = mockConsoleError
-  // @ts-ignore - Mocking process.exit
-  process.exit = mockProcessExit
+  setupBuildStatusTests()
 })
 
 afterAll(() => {
-  server.close()
-  // @ts-ignore - Restoring stdout
-  process.stdout.write = originalStdoutWrite
-  console.error = originalConsoleError
-  // @ts-ignore - Restoring process.exit
-  process.exit = originalProcessExit
+  teardownBuildStatusTests()
 })
 
 afterEach(() => {
-  server.resetHandlers()
-  mockStdoutWrite.mockClear()
-  mockConsoleError.mockClear()
-  mockProcessExit.mockClear()
-  capturedStdout = []
-  capturedErrors = []
+  resetBuildStatusMocks()
 })
 
 describe('build-status command', () => {
-  const createMockConfigLayer = () => Layer.succeed(ConfigService, createMockConfigService())
-
   test('returns pending when no Build Started message found', async () => {
     const messages: MessageInfo[] = [
       {
@@ -590,9 +539,9 @@ describe('build-status command', () => {
 
     try {
       await Effect.runPromise(effect)
-    } catch (_error) {
-      // Should throw error and call process.exit
-      expect(mockProcessExit).toHaveBeenCalledWith(1)
+    } catch {
+      // Should throw error and call process.exit with code 3 for API errors
+      expect(mockProcessExit).toHaveBeenCalledWith(3)
       expect(capturedErrors.length).toBeGreaterThan(0)
     }
   })

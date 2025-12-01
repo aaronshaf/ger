@@ -426,6 +426,10 @@ program
   .description(
     'Check build status from Gerrit messages (auto-detects from HEAD commit if not specified)',
   )
+  .option('--watch', 'Watch build status until completion (mimics gh run watch)')
+  .option('-i, --interval <seconds>', 'Refresh interval in seconds (default: 10)', '10')
+  .option('--timeout <seconds>', 'Maximum wait time in seconds (default: 1800 / 30min)', '1800')
+  .option('--exit-status', 'Exit with non-zero status if build fails')
   .addHelpText(
     'after',
     `
@@ -439,40 +443,58 @@ Output is JSON with a "state" field that can be:
   - failure: Build completed with Verified-1
   - not_found: Change does not exist
 
+Exit codes:
+  - 0: Default for all states (like gh run watch)
+  - 1: Only when --exit-status is used AND build fails
+  - 2: Timeout reached in watch mode
+  - 3: API/network errors
+
 Examples:
-  # Check build status for specific change (using change number)
+  # Single check (current behavior)
   $ ger build-status 392385
   {"state":"success"}
 
-  # Check build status for specific change (using Change-ID)
-  $ ger build-status If5a3ae8cb5a107e187447802358417f311d0c4b1
-  {"state":"running"}
-
-  # Auto-detect from HEAD commit
-  $ ger build-status
+  # Watch until completion (outputs JSON on each poll)
+  $ ger build-status 392385 --watch
   {"state":"pending"}
+  {"state":"running"}
+  {"state":"running"}
+  {"state":"success"}
 
-  # Use in scripts (exit code 0 on success, 1 on error)
-  $ if ger build-status | jq -e '.state == "success"' > /dev/null; then
-      echo "Build passed!"
-    fi
+  # Watch with custom interval (check every 5 seconds)
+  $ ger build-status --watch --interval 5
+
+  # Watch with custom timeout (60 minutes)
+  $ ger build-status --watch --timeout 3600
+
+  # Exit with code 1 on failure (for CI/CD pipelines)
+  $ ger build-status --watch --exit-status && deploy.sh
+
+  # Trigger notification when done (like gh run watch pattern)
+  $ ger build-status --watch && notify-send 'Build is done!'
+
+  # Parse final state in scripts
+  $ ger build-status --watch | tail -1 | jq -r '.state'
+  success
 
 Note: When no change-id is provided, it will be automatically extracted from the
       Change-ID footer in your HEAD commit.`,
   )
-  .action(async (changeId) => {
+  .action(async (changeId, cmdOptions) => {
     try {
-      const effect = buildStatusCommand(changeId).pipe(
-        Effect.provide(GerritApiServiceLive),
-        Effect.provide(ConfigServiceLive),
-      )
+      const effect = buildStatusCommand(changeId, {
+        watch: cmdOptions.watch,
+        interval: Number.parseInt(cmdOptions.interval, 10),
+        timeout: Number.parseInt(cmdOptions.timeout, 10),
+        exitStatus: cmdOptions.exitStatus,
+      }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(ConfigServiceLive))
       await Effect.runPromise(effect)
     } catch (error) {
       // Errors are handled within the command itself
       // This catch is just for any unexpected errors
       if (error instanceof Error && error.message !== 'Process exited') {
         console.error('✗ Unexpected error:', error.message)
-        process.exit(1)
+        process.exit(3)
       }
     }
   })
