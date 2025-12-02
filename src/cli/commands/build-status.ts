@@ -37,7 +37,8 @@ const VERIFIED_PLUS_PATTERN = /Verified\s*[+]\s*1/
 const VERIFIED_MINUS_PATTERN = /Verified\s*[-]\s*1/
 
 /**
- * Parse messages to determine build status based on "Build Started" and verification messages
+ * Parse messages to determine build status based on "Build Started" and verification messages.
+ * Only considers verification messages for the same patchset as the latest build.
  */
 const parseBuildStatus = (messages: readonly MessageInfo[]): BuildStatus => {
   // Empty messages means change exists but has no activity yet - return pending
@@ -45,11 +46,13 @@ const parseBuildStatus = (messages: readonly MessageInfo[]): BuildStatus => {
     return { state: 'pending' }
   }
 
-  // Find the most recent "Build Started" message
+  // Find the most recent "Build Started" message and its revision number
   let lastBuildDate: string | null = null
+  let lastBuildRevision: number | undefined = undefined
   for (const msg of messages) {
     if (BUILD_STARTED_PATTERN.test(msg.message)) {
       lastBuildDate = msg.date
+      lastBuildRevision = msg._revision_number
     }
   }
 
@@ -58,11 +61,17 @@ const parseBuildStatus = (messages: readonly MessageInfo[]): BuildStatus => {
     return { state: 'pending' }
   }
 
-  // Check for verification messages after the build started
+  // Check for verification messages after the build started AND for the same revision
   for (const msg of messages) {
     const date = msg.date
     // Gerrit timestamps are ISO 8601 strings (lexicographically sortable)
     if (date <= lastBuildDate) continue
+
+    // Only consider verification messages for the same patchset
+    // If revision numbers are available, they must match
+    if (lastBuildRevision !== undefined && msg._revision_number !== undefined) {
+      if (msg._revision_number !== lastBuildRevision) continue
+    }
 
     if (VERIFIED_PLUS_PATTERN.test(msg.message)) {
       return { state: 'success' }
