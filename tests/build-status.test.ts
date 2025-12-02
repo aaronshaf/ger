@@ -637,4 +637,153 @@ describe('build-status command', () => {
     // Regex should handle extra whitespace
     expect(output).toEqual({ state: 'running' })
   })
+
+  test('ignores verification from older patchset when newer patchset build is running', async () => {
+    // This test replicates the bug scenario:
+    // - PS 3 build started, then PS 4 build started
+    // - PS 3 verification (-1) comes AFTER PS 4 build started
+    // - Should return "running" because PS 4 has no verification yet
+    const messages: MessageInfo[] = [
+      {
+        id: 'msg1',
+        message: 'Build Started https://jenkins.example.com/job/123/',
+        date: '2024-01-15 11:12:00.000000000',
+        _revision_number: 2,
+        author: {
+          _account_id: 9999,
+          name: 'Service Cloud Jenkins',
+        },
+      },
+      {
+        id: 'msg2',
+        message: 'Patch Set 2: Verified -1\n\nBuild Failed',
+        date: '2024-01-15 11:23:00.000000000',
+        _revision_number: 2,
+        author: {
+          _account_id: 9999,
+          name: 'Service Cloud Jenkins',
+        },
+      },
+      {
+        id: 'msg3',
+        message: 'Build Started https://jenkins.example.com/job/456/',
+        date: '2024-01-15 13:57:00.000000000',
+        _revision_number: 3,
+        author: {
+          _account_id: 9999,
+          name: 'Service Cloud Jenkins',
+        },
+      },
+      {
+        id: 'msg4',
+        message: 'Build Started https://jenkins.example.com/job/789/',
+        date: '2024-01-15 14:02:00.000000000',
+        _revision_number: 4,
+        author: {
+          _account_id: 9999,
+          name: 'Service Cloud Jenkins',
+        },
+      },
+      {
+        id: 'msg5',
+        message: 'Patch Set 3: Verified -1\n\nBuild Failed : ABORTED',
+        date: '2024-01-15 14:03:00.000000000',
+        _revision_number: 3,
+        author: {
+          _account_id: 9999,
+          name: 'Service Cloud Jenkins',
+        },
+      },
+    ]
+
+    server.use(
+      http.get('*/a/changes/12345', ({ request }) => {
+        const url = new URL(request.url)
+        if (url.searchParams.get('o') === 'MESSAGES') {
+          return HttpResponse.json(
+            { messages },
+            {
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        return HttpResponse.text('Not Found', { status: 404 })
+      }),
+    )
+
+    const effect = buildStatusCommand('12345').pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(createMockConfigLayer()),
+    )
+
+    await Effect.runPromise(effect)
+
+    expect(capturedStdout.length).toBe(1)
+    const output = JSON.parse(capturedStdout[0])
+    // PS 4 build started at 14:02, PS 3 verification at 14:03 should be IGNORED
+    // because it's for a different revision. PS 4 build is still running.
+    expect(output).toEqual({ state: 'running' })
+  })
+
+  test('returns success when verification matches the latest patchset', async () => {
+    const messages: MessageInfo[] = [
+      {
+        id: 'msg1',
+        message: 'Build Started',
+        date: '2024-01-15 10:00:00.000000000',
+        _revision_number: 1,
+        author: {
+          _account_id: 9999,
+          name: 'CI Bot',
+        },
+      },
+      {
+        id: 'msg2',
+        message: 'Build Started',
+        date: '2024-01-15 11:00:00.000000000',
+        _revision_number: 2,
+        author: {
+          _account_id: 9999,
+          name: 'CI Bot',
+        },
+      },
+      {
+        id: 'msg3',
+        message: 'Patch Set 2: Verified+1',
+        date: '2024-01-15 11:15:00.000000000',
+        _revision_number: 2,
+        author: {
+          _account_id: 9999,
+          name: 'CI Bot',
+        },
+      },
+    ]
+
+    server.use(
+      http.get('*/a/changes/12345', ({ request }) => {
+        const url = new URL(request.url)
+        if (url.searchParams.get('o') === 'MESSAGES') {
+          return HttpResponse.json(
+            { messages },
+            {
+              headers: { 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        return HttpResponse.text('Not Found', { status: 404 })
+      }),
+    )
+
+    const effect = buildStatusCommand('12345').pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(createMockConfigLayer()),
+    )
+
+    await Effect.runPromise(effect)
+
+    expect(capturedStdout.length).toBe(1)
+    const output = JSON.parse(capturedStdout[0])
+    // PS 2 build started at 11:00, PS 2 verification at 11:15 - same revision, success
+    expect(output).toEqual({ state: 'success' })
+  })
 })
