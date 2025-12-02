@@ -92,12 +92,8 @@ describe('build-status command - watch mode', () => {
     expect(JSON.parse(capturedStdout[1])).toEqual({ state: 'running' })
     expect(JSON.parse(capturedStdout[2])).toEqual({ state: 'success' })
 
-    // Should have logged progress to stderr
-    expect(capturedErrors.length).toBeGreaterThan(0)
-    expect(capturedErrors.some((e: string) => e.includes('Watching build status'))).toBe(true)
-    expect(
-      capturedErrors.some((e: string) => e.includes('Build completed with status: success')),
-    ).toBe(true)
+    // Minimalistic output: no stderr messages except on timeout/error
+    expect(capturedErrors.length).toBe(0)
   })
 
   test('polls until failure state is reached', async () => {
@@ -155,9 +151,9 @@ describe('build-status command - watch mode', () => {
 
     expect(capturedStdout.length).toBeGreaterThanOrEqual(2)
     expect(JSON.parse(capturedStdout[capturedStdout.length - 1])).toEqual({ state: 'failure' })
-    expect(
-      capturedErrors.some((e: string) => e.includes('Build completed with status: failure')),
-    ).toBe(true)
+
+    // Minimalistic output: no stderr messages except on timeout/error
+    expect(capturedErrors.length).toBe(0)
   })
 
   test('times out after specified duration', async () => {
@@ -303,9 +299,10 @@ describe('build-status command - watch mode', () => {
 
     expect(capturedStdout.length).toBe(1)
     expect(JSON.parse(capturedStdout[0])).toEqual({ state: 'not_found' })
+
     // 404 errors bypass pollBuildStatus and are handled in error handler
-    // So we get "Watching build status" but not "Build completed" message
-    expect(capturedErrors.some((e: string) => e.includes('Watching build status'))).toBe(true)
+    // Minimalistic output: no stderr messages for not_found state
+    expect(capturedErrors.length).toBe(0)
   })
 
   test('without watch flag, behaves as single check', async () => {

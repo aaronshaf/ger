@@ -108,13 +108,6 @@ const pollBuildStatus = (
     const startTime = Date.now()
     const timeoutMs = options.timeout * 1000
 
-    // Initial message to stderr
-    yield* Effect.sync(() => {
-      console.error(
-        `Watching build status (polling every ${options.interval}s, timeout: ${options.timeout}s)...`,
-      )
-    })
-
     while (true) {
       // Check timeout
       const elapsed = Date.now() - startTime
@@ -147,25 +140,18 @@ const pollBuildStatus = (
         process.stdout.write(JSON.stringify(status) + '\n')
       })
 
-      // Terminal states - return immediately
-      if (
-        status.state === 'success' ||
-        status.state === 'failure' ||
-        status.state === 'not_found'
-      ) {
-        yield* Effect.sync(() => {
-          console.error(`Build completed with status: ${status.state}`)
-        })
+      // Terminal states - wait for interval before returning to allow logs to be written
+      if (status.state === 'success' || status.state === 'not_found') {
         return status
       }
 
-      // Non-terminal states - log progress and wait
-      const elapsedSeconds = Math.floor(elapsed / 1000)
-      yield* Effect.sync(() => {
-        console.error(`[${elapsedSeconds}s elapsed] Build status: ${status.state}`)
-      })
+      if (status.state === 'failure') {
+        // Wait for interval seconds to allow build failure logs to be fully written
+        yield* Effect.sleep(options.interval * 1000)
+        return status
+      }
 
-      // Sleep for interval duration
+      // Non-terminal states - sleep for interval duration
       yield* Effect.sleep(options.interval * 1000)
     }
   })
