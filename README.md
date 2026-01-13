@@ -55,6 +55,10 @@ ger add-reviewer user@example.com -c 12345
 # Get diff for review
 ger diff 12345
 
+# Search for changes using Gerrit query syntax
+ger search "owner:self status:open"
+ger search "project:my-project" -n 10
+
 # Extract URLs from messages (e.g., Jenkins build links)
 ger extract-url "build-summary-report" | tail -1
 
@@ -100,6 +104,54 @@ ger incoming --pretty
 ger workspace
 ger workspace --pretty
 ```
+
+### Search Changes
+
+Search for changes across your Gerrit instance using native query syntax:
+
+```bash
+# Search for all open changes (default)
+ger search
+
+# Search for your open changes
+ger search "owner:self status:open"
+
+# Search for changes by a specific user
+ger search "owner:john@example.com"
+
+# Search by project
+ger search "project:my-project status:open"
+
+# Search with date filters
+ger search "owner:self after:2025-01-01"
+ger search "status:merged age:7d"
+
+# Combine filters
+ger search "owner:self status:merged before:2025-06-01"
+
+# Limit results (default: 25)
+ger search "project:my-project" -n 10
+
+# XML output for automation
+ger search "owner:self" --xml
+```
+
+#### Common query operators:
+| Operator | Description |
+|----------|-------------|
+| `owner:USER` | Changes owned by USER (use 'self' for yourself) |
+| `status:STATE` | open, merged, abandoned, closed |
+| `project:NAME` | Changes in a specific project |
+| `branch:NAME` | Changes targeting a branch |
+| `age:TIME` | Time since last update (e.g., 1d, 2w, 1mon) |
+| `before:DATE` | Changes modified before date (YYYY-MM-DD) |
+| `after:DATE` | Changes modified after date (YYYY-MM-DD) |
+| `is:wip` | Work-in-progress changes |
+| `is:submittable` | Changes ready to submit |
+| `reviewer:USER` | Changes where USER is a reviewer |
+| `label:NAME=VALUE` | Filter by label (e.g., label:Code-Review+2) |
+
+See the [full query syntax documentation](https://gerrit-review.googlesource.com/Documentation/user-search.html).
 
 ### Comments
 

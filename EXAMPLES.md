@@ -117,6 +117,54 @@ const program = pipe(
 Effect.runPromise(program).catch(console.error)
 ```
 
+### 2b. Search Changes with Query Syntax
+
+```typescript
+import { Effect, pipe } from 'effect'
+import {
+  GerritApiService,
+  GerritApiServiceLive,
+  ConfigServiceLive,
+} from '@aaronshaf/ger'
+
+const searchChanges = (query: string, limit = 25) =>
+  Effect.gen(function* () {
+    const api = yield* GerritApiService
+
+    // Use Gerrit query syntax to search changes
+    const fullQuery = query.includes('limit:') ? query : `${query} limit:${limit}`
+    const changes = yield* api.listChanges(fullQuery)
+
+    // Group by project for organized output
+    const byProject = new Map<string, typeof changes>()
+    for (const change of changes) {
+      const existing = byProject.get(change.project) ?? []
+      existing.push(change)
+      byProject.set(change.project, existing)
+    }
+
+    console.log(`Found ${changes.length} changes:`)
+    for (const [project, projectChanges] of byProject) {
+      console.log(`\n${project}:`)
+      for (const change of projectChanges) {
+        console.log(`  #${change._number} - ${change.subject} (${change.status})`)
+      }
+    }
+
+    return changes
+  })
+
+// Example queries
+const program = pipe(
+  // Search for merged changes in the last week
+  searchChanges('status:merged age:7d', 10),
+  Effect.provide(GerritApiServiceLive),
+  Effect.provide(ConfigServiceLive)
+)
+
+Effect.runPromise(program).catch(console.error)
+```
+
 ### 3. Post a Comment
 
 ```typescript

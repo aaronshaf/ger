@@ -17,7 +17,7 @@ Examples:
   $ ger search "owner:john@example.com"
 
   # Search by project
-  $ ger search "project:canvas-lms status:open"
+  $ ger search "project:my-project status:open"
 
   # Search with date filters
   $ ger search "owner:self after:2025-01-01"
@@ -27,7 +27,7 @@ Examples:
   $ ger search "owner:self status:merged before:2025-06-01"
 
   # Limit results
-  $ ger search "project:canvas-lms" -n 10
+  $ ger search "project:my-project" -n 10
 
 Common query operators:
   owner:USER        Changes owned by USER (use 'self' for yourself)
