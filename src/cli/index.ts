@@ -43,8 +43,9 @@ import { mineCommand } from './commands/mine'
 import { openCommand } from './commands/open'
 import { pushCommand, PUSH_HELP_TEXT } from './commands/push'
 import { reviewCommand } from './commands/review'
+import { searchCommand, SEARCH_HELP_TEXT } from './commands/search'
 import { setup } from './commands/setup'
-import { showCommand } from './commands/show'
+import { showCommand, SHOW_HELP_TEXT } from './commands/show'
 import { statusCommand } from './commands/status'
 import { workspaceCommand } from './commands/workspace'
 import { sanitizeCDATA } from '@/utils/shell-safety'
@@ -230,6 +231,34 @@ program
       }
       process.exit(1)
     }
+  })
+
+// search command
+program
+  .command('search [query]')
+  .description('Search changes using Gerrit query syntax')
+  .option('--xml', 'XML output for LLM consumption')
+  .option('-n, --limit <number>', 'Limit results (default: 25)')
+  .addHelpText('after', SEARCH_HELP_TEXT)
+  .action(async (query, options) => {
+    const effect = searchCommand(query, options).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(ConfigServiceLive),
+    )
+    await Effect.runPromise(effect).catch((error: unknown) => {
+      if (options.xml) {
+        console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
+        console.log(`<search_result>`)
+        console.log(`  <status>error</status>`)
+        console.log(
+          `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
+        )
+        console.log(`</search_result>`)
+      } else {
+        console.error('✗ Error:', error instanceof Error ? error.message : String(error))
+      }
+      process.exit(1)
+    })
   })
 
 // workspace command
@@ -420,28 +449,7 @@ program
   )
   .option('--xml', 'XML output for LLM consumption')
   .option('--json', 'JSON output for programmatic consumption')
-  .addHelpText(
-    'after',
-    `
-Examples:
-  # Show specific change (using change number)
-  $ ger show 392385
-
-  # Show specific change (using Change-ID)
-  $ ger show If5a3ae8cb5a107e187447802358417f311d0c4b1
-
-  # Auto-detect Change-ID from HEAD commit
-  $ ger show
-  $ ger show --xml
-  $ ger show --json
-
-  # Extract build failure URL with jq
-  $ ger show 392090 --json | jq -r '.messages[] | select(.message | contains("Build Failed")) | .message' | grep -oP 'https://[^\\s]+'
-
-Note: When no change-id is provided, it will be automatically extracted from the
-      Change-ID footer in your HEAD commit. You must be in a git repository with
-      a commit that has a Change-ID.`,
-  )
+  .addHelpText('after', SHOW_HELP_TEXT)
   .action(async (changeId, options) => {
     try {
       const effect = showCommand(changeId, options).pipe(
