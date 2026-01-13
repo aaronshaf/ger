@@ -3,6 +3,55 @@ import { type ApiError, GerritApiService } from '@/api/gerrit'
 import type { MessageInfo } from '@/schemas/gerrit'
 import { getChangeIdFromHead, GitError, NoChangeIdError } from '@/utils/git-commit'
 
+/** Help text for build-status command - exported to keep index.ts under line limit */
+export const BUILD_STATUS_HELP_TEXT = `
+This command parses Gerrit change messages to determine build status.
+It looks for "Build Started" messages and subsequent verification labels.
+
+Output is JSON with a "state" field that can be:
+  - pending: No build has started yet
+  - running: Build started but no verification yet
+  - success: Build completed with Verified+1
+  - failure: Build completed with Verified-1
+  - not_found: Change does not exist
+
+Exit codes:
+  - 0: Default for all states (like gh run watch)
+  - 1: Only when --exit-status is used AND build fails
+  - 2: Timeout reached in watch mode
+  - 3: API/network errors
+
+Examples:
+  # Single check (current behavior)
+  $ ger build-status 392385
+  {"state":"success"}
+
+  # Watch until completion (outputs JSON on each poll)
+  $ ger build-status 392385 --watch
+  {"state":"pending"}
+  {"state":"running"}
+  {"state":"running"}
+  {"state":"success"}
+
+  # Watch with custom interval (check every 5 seconds)
+  $ ger build-status --watch --interval 5
+
+  # Watch with custom timeout (60 minutes)
+  $ ger build-status --watch --timeout 3600
+
+  # Exit with code 1 on failure (for CI/CD pipelines)
+  $ ger build-status --watch --exit-status && deploy.sh
+
+  # Trigger notification when done (like gh run watch pattern)
+  $ ger build-status --watch && notify-send 'Build is done!'
+
+  # Parse final state in scripts
+  $ ger build-status --watch | tail -1 | jq -r '.state'
+  success
+
+Note: When no change-id is provided, it will be automatically extracted from the
+      Change-ID footer in your HEAD commit.`
+
 // Export types for external use
 export type BuildState = 'pending' | 'running' | 'success' | 'failure' | 'not_found'
 

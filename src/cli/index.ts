@@ -30,9 +30,10 @@ import { GerritApiServiceLive } from '@/api/gerrit'
 import { ConfigServiceLive } from '@/services/config'
 import { ReviewStrategyServiceLive } from '@/services/review-strategy'
 import { GitWorktreeServiceLive } from '@/services/git-worktree'
+import { CommitHookServiceLive } from '@/services/commit-hook'
 import { abandonCommand } from './commands/abandon'
 import { addReviewerCommand } from './commands/add-reviewer'
-import { buildStatusCommand } from './commands/build-status'
+import { buildStatusCommand, BUILD_STATUS_HELP_TEXT } from './commands/build-status'
 import { commentCommand } from './commands/comment'
 import { commentsCommand } from './commands/comments'
 import { diffCommand } from './commands/diff'
@@ -40,6 +41,7 @@ import { extractUrlCommand } from './commands/extract-url'
 import { incomingCommand } from './commands/incoming'
 import { mineCommand } from './commands/mine'
 import { openCommand } from './commands/open'
+import { pushCommand, PUSH_HELP_TEXT } from './commands/push'
 import { reviewCommand } from './commands/review'
 import { setup } from './commands/setup'
 import { showCommand } from './commands/show'
@@ -474,56 +476,7 @@ program
   .option('-i, --interval <seconds>', 'Refresh interval in seconds (default: 10)', '10')
   .option('--timeout <seconds>', 'Maximum wait time in seconds (default: 1800 / 30min)', '1800')
   .option('--exit-status', 'Exit with non-zero status if build fails')
-  .addHelpText(
-    'after',
-    `
-This command parses Gerrit change messages to determine build status.
-It looks for "Build Started" messages and subsequent verification labels.
-
-Output is JSON with a "state" field that can be:
-  - pending: No build has started yet
-  - running: Build started but no verification yet
-  - success: Build completed with Verified+1
-  - failure: Build completed with Verified-1
-  - not_found: Change does not exist
-
-Exit codes:
-  - 0: Default for all states (like gh run watch)
-  - 1: Only when --exit-status is used AND build fails
-  - 2: Timeout reached in watch mode
-  - 3: API/network errors
-
-Examples:
-  # Single check (current behavior)
-  $ ger build-status 392385
-  {"state":"success"}
-
-  # Watch until completion (outputs JSON on each poll)
-  $ ger build-status 392385 --watch
-  {"state":"pending"}
-  {"state":"running"}
-  {"state":"running"}
-  {"state":"success"}
-
-  # Watch with custom interval (check every 5 seconds)
-  $ ger build-status --watch --interval 5
-
-  # Watch with custom timeout (60 minutes)
-  $ ger build-status --watch --timeout 3600
-
-  # Exit with code 1 on failure (for CI/CD pipelines)
-  $ ger build-status --watch --exit-status && deploy.sh
-
-  # Trigger notification when done (like gh run watch pattern)
-  $ ger build-status --watch && notify-send 'Build is done!'
-
-  # Parse final state in scripts
-  $ ger build-status --watch | tail -1 | jq -r '.state'
-  success
-
-Note: When no change-id is provided, it will be automatically extracted from the
-      Change-ID footer in your HEAD commit.`,
-  )
+  .addHelpText('after', BUILD_STATUS_HELP_TEXT)
   .action(async (changeId, cmdOptions) => {
     try {
       const effect = buildStatusCommand(changeId, {
@@ -610,6 +563,42 @@ Note:
       } else {
         console.error('✗ Error:', errorMessage)
       }
+      process.exit(1)
+    }
+  })
+
+// push command
+program
+  .command('push')
+  .description('Push commits to Gerrit for code review')
+  .option('-b, --branch <branch>', 'Target branch (default: auto-detect)')
+  .option('-t, --topic <topic>', 'Set change topic')
+  .option('-r, --reviewer <email...>', 'Add reviewer(s)')
+  .option('--cc <email...>', 'Add CC recipient(s)')
+  .option('--wip', 'Mark as work-in-progress')
+  .option('--ready', 'Mark as ready for review')
+  .option('--hashtag <tag...>', 'Add hashtag(s)')
+  .option('--private', 'Mark change as private')
+  .option('--draft', 'Alias for --wip')
+  .option('--dry-run', 'Show what would be pushed without pushing')
+  .addHelpText('after', PUSH_HELP_TEXT)
+  .action(async (options) => {
+    try {
+      const effect = pushCommand({
+        branch: options.branch,
+        topic: options.topic,
+        reviewer: options.reviewer,
+        cc: options.cc,
+        wip: options.wip,
+        ready: options.ready,
+        hashtag: options.hashtag,
+        private: options.private,
+        draft: options.draft,
+        dryRun: options.dryRun,
+      }).pipe(Effect.provide(CommitHookServiceLive), Effect.provide(ConfigServiceLive))
+      await Effect.runPromise(effect)
+    } catch (error) {
+      console.error('Error:', error instanceof Error ? error.message : String(error))
       process.exit(1)
     }
   })
