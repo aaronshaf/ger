@@ -31,6 +31,7 @@ import { ConfigServiceLive } from '@/services/config'
 import { ReviewStrategyServiceLive } from '@/services/review-strategy'
 import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { abandonCommand } from './commands/abandon'
+import { addReviewerCommand } from './commands/add-reviewer'
 import { buildStatusCommand } from './commands/build-status'
 import { commentCommand } from './commands/comment'
 import { commentsCommand } from './commands/comments'
@@ -312,6 +313,49 @@ program
           `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
         )
         console.log(`</abandon_result>`)
+      } else {
+        console.error('✗ Error:', error instanceof Error ? error.message : String(error))
+      }
+      process.exit(1)
+    }
+  })
+
+// add-reviewer command
+program
+  .command('add-reviewer <reviewers...>')
+  .description('Add reviewers to a change')
+  .option('-c, --change <change-id>', 'Change ID (required until auto-detection is implemented)')
+  .option('--cc', 'Add as CC instead of reviewer')
+  .option(
+    '--notify <level>',
+    'Notification level: none, owner, owner_reviewers, all (default: all)',
+  )
+  .option('--xml', 'XML output for LLM consumption')
+  .addHelpText(
+    'after',
+    `
+Examples:
+  $ ger add-reviewer user@example.com -c 12345          # Add a reviewer
+  $ ger add-reviewer user1@example.com user2@example.com -c 12345  # Multiple
+  $ ger add-reviewer --cc user@example.com -c 12345     # Add as CC
+  $ ger add-reviewer --notify none user@example.com -c 12345  # No email`,
+  )
+  .action(async (reviewers, options) => {
+    try {
+      const effect = addReviewerCommand(reviewers, options).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(ConfigServiceLive),
+      )
+      await Effect.runPromise(effect)
+    } catch (error) {
+      if (options.xml) {
+        console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
+        console.log(`<add_reviewer_result>`)
+        console.log(`  <status>error</status>`)
+        console.log(
+          `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
+        )
+        console.log(`</add_reviewer_result>`)
       } else {
         console.error('✗ Error:', error instanceof Error ? error.message : String(error))
       }

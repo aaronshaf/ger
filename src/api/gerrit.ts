@@ -9,6 +9,8 @@ import {
   FileInfo,
   type GerritCredentials,
   type ReviewInput,
+  type ReviewerInput,
+  ReviewerResult,
   RevisionInfo,
 } from '@/schemas/gerrit'
 import { filterMeaningfulMessages } from '@/utils/message-filters'
@@ -50,6 +52,11 @@ export interface GerritApiServiceImpl {
     revisionId?: string,
   ) => Effect.Effect<Record<string, readonly CommentInfo[]>, ApiError>
   readonly getMessages: (changeId: string) => Effect.Effect<readonly MessageInfo[], ApiError>
+  readonly addReviewer: (
+    changeId: string,
+    reviewer: string,
+    options?: { state?: 'REVIEWER' | 'CC'; notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL' },
+  ) => Effect.Effect<ReviewerResult, ApiError>
 }
 
 // Export both the tag value and the type for use in Effect requirements
@@ -485,6 +492,26 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           return changeResponse.messages || []
         }).pipe(Effect.map(filterMeaningfulMessages))
 
+      const addReviewer = (
+        changeId: string,
+        reviewer: string,
+        options?: {
+          state?: 'REVIEWER' | 'CC'
+          notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL'
+        },
+      ) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/reviewers`
+          const body: ReviewerInput = {
+            reviewer,
+            ...(options?.state && { state: options.state }),
+            ...(options?.notify && { notify: options.notify }),
+          }
+          return yield* makeRequest(url, authHeader, 'POST', body, ReviewerResult)
+        })
+
       return {
         getChange,
         listChanges,
@@ -499,6 +526,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         getDiff,
         getComments,
         getMessages,
+        addReviewer,
       }
     }),
   )

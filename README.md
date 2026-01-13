@@ -49,6 +49,9 @@ ger show 12345
 # Add a comment
 ger comment 12345 -m "LGTM"
 
+# Add reviewers to a change
+ger add-reviewer user@example.com -c 12345
+
 # Get diff for review
 ger diff 12345
 
@@ -358,6 +361,38 @@ ger open 12345
 ger abandon 12345
 ger abandon 12345 -m "Reason"
 ```
+
+### Add Reviewers
+
+Add reviewers or CCs to a change:
+
+```bash
+# Add a single reviewer
+ger add-reviewer user@example.com -c 12345
+
+# Add multiple reviewers
+ger add-reviewer user1@example.com user2@example.com -c 12345
+
+# Add as CC instead of reviewer
+ger add-reviewer --cc user@example.com -c 12345
+
+# Suppress email notifications
+ger add-reviewer --notify none user@example.com -c 12345
+
+# XML output for automation
+ger add-reviewer user@example.com -c 12345 --xml
+```
+
+#### Options:
+- `-c, --change <id>` - Change ID (required)
+- `--cc` - Add as CC instead of reviewer
+- `--notify <level>` - Notification level: `none`, `owner`, `owner_reviewers`, `all` (default: `all`)
+- `--xml` - XML output for LLM/automation consumption
+
+#### Notes:
+- Both email addresses and usernames are accepted
+- Multiple reviewers can be added in a single command
+- Use `--cc` for carbon copy (notified but not required to review)
 
 ### AI-Powered Review
 
