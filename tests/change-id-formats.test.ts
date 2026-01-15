@@ -22,7 +22,7 @@ const mockChange = generateMockChange({
   change_id: CHANGE_ID,
   subject: 'WIP: test',
   status: 'NEW',
-  project: 'canvas-lms',
+  project: 'my-project',
   branch: 'master',
   created: '2024-01-15 10:00:00.000000000',
   updated: '2024-01-15 12:00:00.000000000',

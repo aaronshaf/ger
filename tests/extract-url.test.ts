@@ -98,7 +98,7 @@ describe('extract-url command', () => {
     {
       id: 'msg1',
       message:
-        'Patch Set 1:\n\nBuild Started https://jenkins.inst-ci.net/job/Canvas/job/main/154074/',
+        'Patch Set 1:\n\nBuild Started https://jenkins.example.com/job/MyProject/job/main/154074/',
       author: { _account_id: 1001, name: 'Jenkins Bot' },
       date: '2025-01-15 09:00:00.000000000',
       _revision_number: 1,
@@ -106,7 +106,7 @@ describe('extract-url command', () => {
     {
       id: 'msg2',
       message:
-        'Patch Set 1: Verified-1\n\nBuild Failed \n\nhttps://jenkins.inst-ci.net/job/Canvas/job/main/154074//build-summary-report/ : FAILURE',
+        'Patch Set 1: Verified-1\n\nBuild Failed \n\nhttps://jenkins.example.com/job/MyProject/job/main/154074//build-summary-report/ : FAILURE',
       author: { _account_id: 1001, name: 'Jenkins Bot' },
       date: '2025-01-15 09:15:00.000000000',
       _revision_number: 1,
@@ -114,7 +114,7 @@ describe('extract-url command', () => {
     {
       id: 'msg3',
       message:
-        'Patch Set 2:\n\nBuild Started https://jenkins.inst-ci.net/job/Canvas/job/main/156340/',
+        'Patch Set 2:\n\nBuild Started https://jenkins.example.com/job/MyProject/job/main/156340/',
       author: { _account_id: 1001, name: 'Jenkins Bot' },
       date: '2025-01-15 10:00:00.000000000',
       _revision_number: 2,
@@ -122,7 +122,7 @@ describe('extract-url command', () => {
     {
       id: 'msg4',
       message:
-        'Patch Set 2: Verified-1\n\nBuild Failed \n\nhttps://jenkins.inst-ci.net/job/Canvas/job/main/156340//build-summary-report/ : FAILURE',
+        'Patch Set 2: Verified-1\n\nBuild Failed \n\nhttps://jenkins.example.com/job/MyProject/job/main/156340//build-summary-report/ : FAILURE',
       author: { _account_id: 1001, name: 'Jenkins Bot' },
       date: '2025-01-15 10:15:00.000000000',
       _revision_number: 2,
@@ -165,13 +165,13 @@ describe('extract-url command', () => {
     const output = capturedLogs.join('\n')
 
     // Should contain all Jenkins URLs in chronological order
-    expect(output).toContain('https://jenkins.inst-ci.net/job/Canvas/job/main/154074/')
+    expect(output).toContain('https://jenkins.example.com/job/MyProject/job/main/154074/')
     expect(output).toContain(
-      'https://jenkins.inst-ci.net/job/Canvas/job/main/154074//build-summary-report/',
+      'https://jenkins.example.com/job/MyProject/job/main/154074//build-summary-report/',
     )
-    expect(output).toContain('https://jenkins.inst-ci.net/job/Canvas/job/main/156340/')
+    expect(output).toContain('https://jenkins.example.com/job/MyProject/job/main/156340/')
     expect(output).toContain(
-      'https://jenkins.inst-ci.net/job/Canvas/job/main/156340//build-summary-report/',
+      'https://jenkins.example.com/job/MyProject/job/main/156340//build-summary-report/',
     )
 
     // Check order - should be chronological (oldest first)
@@ -204,10 +204,9 @@ describe('extract-url command', () => {
     setupMockHandlers()
 
     const mockConfigLayer = createMockConfigLayer()
-    const program = extractUrlCommand('job/Canvas/job/main/\\d+/$', '12345', { regex: true }).pipe(
-      Effect.provide(GerritApiServiceLive),
-      Effect.provide(mockConfigLayer),
-    )
+    const program = extractUrlCommand('job/MyProject/job/main/\\d+/$', '12345', {
+      regex: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
 
     await Effect.runPromise(program)
 
@@ -216,8 +215,8 @@ describe('extract-url command', () => {
 
     // Should only match URLs ending with job number (not build-summary-report)
     expect(lines.length).toBe(2)
-    expect(lines[0]).toBe('https://jenkins.inst-ci.net/job/Canvas/job/main/154074/')
-    expect(lines[1]).toBe('https://jenkins.inst-ci.net/job/Canvas/job/main/156340/')
+    expect(lines[0]).toBe('https://jenkins.example.com/job/MyProject/job/main/154074/')
+    expect(lines[1]).toBe('https://jenkins.example.com/job/MyProject/job/main/156340/')
   })
 
   test('should include URLs from comments when --include-comments is used', async () => {
@@ -413,7 +412,7 @@ describe('extract-url command', () => {
     const output = capturedLogs.join('\n')
 
     // Should match jenkins URLs (case-insensitive)
-    expect(output).toContain('https://jenkins.inst-ci.net')
+    expect(output).toContain('https://jenkins.example.com')
   })
 
   test('should extract multiple different URLs from same message', async () => {

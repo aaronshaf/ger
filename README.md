@@ -281,7 +281,7 @@ ger extract-url "build-summary" If5a3ae8cb5a107e187447802358417f311d0c4b1
 ger extract-url "build-summary-report" 12345 | tail -1 | jk failures --smart --xml
 
 # Use regex for precise matching
-ger extract-url "job/Canvas/job/main/\d+/" --regex
+ger extract-url "job/MyProject/job/main/\d+/" --regex
 
 # Search both messages and inline comments
 ger extract-url "github.com" --include-comments

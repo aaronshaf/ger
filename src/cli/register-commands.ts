@@ -511,7 +511,7 @@ Examples:
   $ ger extract-url "jenkins" If5a3ae8cb5a107e187447802358417f311d0c4b1
 
   # Use regex for precise matching
-  $ ger extract-url "job/Canvas/job/main/\\d+/" --regex
+  $ ger extract-url "job/MyProject/job/main/\\d+/" --regex
 
   # Search both messages and inline comments
   $ ger extract-url "github.com" --include-comments

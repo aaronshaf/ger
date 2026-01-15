@@ -71,3 +71,68 @@ export const generateMockAccount = () => ({
   email: 'test@example.com',
   username: 'testuser',
 })
+
+/**
+ * Generate mock revision data to be included in ChangeInfo
+ * Used when simulating API responses with CURRENT_REVISION option
+ */
+export const generateMockRevision = (
+  patchsetNumber = 1,
+  sha = '54795ce71b351480c887e92aa0e5b9a57aef58ab',
+) => ({
+  kind: 'REWORK',
+  _number: patchsetNumber,
+  created: '2023-12-01 10:00:00.000000000',
+  uploader: {
+    _account_id: 1000096,
+    name: 'John Developer',
+    email: 'john@example.com',
+  },
+  ref: `refs/changes/${String(Math.floor(12345 % 100)).padStart(2, '0')}/12345/${patchsetNumber}`,
+  fetch: {
+    http: {
+      url: 'https://gerrit.example.com/myProject',
+      ref: `refs/changes/${String(Math.floor(12345 % 100)).padStart(2, '0')}/12345/${patchsetNumber}`,
+    },
+  },
+  commit: {
+    commit: sha,
+    parents: [
+      {
+        commit: 'parent-sha-1234567890abcdef',
+        subject: 'Parent commit',
+      },
+    ],
+    author: {
+      name: 'John Developer',
+      email: 'john@example.com',
+      date: '2023-12-01 10:00:00.000000000',
+    },
+    committer: {
+      name: 'John Developer',
+      email: 'john@example.com',
+      date: '2023-12-01 10:00:00.000000000',
+    },
+    subject: 'Implementing new feature',
+    message: 'Implementing new feature\n\nThis is the full commit message.',
+  },
+})
+
+/**
+ * Generate mock change with revision data (simulates API response with CURRENT_REVISION option)
+ */
+export const generateMockChangeWithRevision = (
+  overrides?: Partial<Schema.Schema.Type<typeof ChangeInfo>>,
+  patchsetNumber = 1,
+): Schema.Schema.Type<typeof ChangeInfo> => {
+  const sha = '54795ce71b351480c887e92aa0e5b9a57aef58ab'
+  const revision = generateMockRevision(patchsetNumber, sha)
+
+  return generateMockChange({
+    current_revision: sha,
+    revisions: {
+      [sha]: revision,
+    },
+    ...overrides,
+  })
+}

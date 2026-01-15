@@ -85,7 +85,7 @@ describe('search command', () => {
       generateMockChange({
         _number: 12345,
         subject: "John's change",
-        project: 'canvas-lms',
+        project: 'my-project',
         status: 'NEW',
         owner: {
           _account_id: 2000,
