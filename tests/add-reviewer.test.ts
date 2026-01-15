@@ -259,7 +259,8 @@ describe('add-reviewer command', () => {
     expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
     expect(output).toContain('<add_reviewer_result>')
     expect(output).toContain('<change_id>12345</change_id>')
-    expect(output).toContain('<state>reviewer</state>')
+    expect(output).toContain('<state>REVIEWER</state>')
+    expect(output).toContain('<entity_type>individual</entity_type>')
     expect(output).toContain('<reviewer status="added">')
     expect(output).toContain('<input>reviewer@example.com</input>')
     expect(output).toContain('<name><![CDATA[Reviewer User]]></name>')
@@ -389,5 +390,190 @@ describe('add-reviewer command', () => {
     await Effect.runPromise(program)
 
     expect(receivedState).toBe('REVIEWER')
+  })
+
+  it('should add a group as reviewer with --group flag', async () => {
+    server.use(
+      http.post('*/a/changes/12345/reviewers', async ({ request }) => {
+        const body = (await request.json()) as { reviewer: string; state?: string }
+        expect(body.reviewer).toBe('project-reviewers')
+        expect(body.state).toBe('REVIEWER')
+        return HttpResponse.text(
+          `)]}'\n${JSON.stringify({
+            input: 'project-reviewers',
+            reviewers: [
+              {
+                _account_id: 3001,
+                name: 'Alice Developer',
+                email: 'alice@example.com',
+              },
+              {
+                _account_id: 3002,
+                name: 'Bob Developer',
+                email: 'bob@example.com',
+              },
+            ],
+          })}`,
+        )
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = addReviewerCommand(['project-reviewers'], {
+      change: '12345',
+      group: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    await Effect.runPromise(program)
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('Added Alice Developer as group')
+  })
+
+  it('should add a group as CC with --group and --cc flags', async () => {
+    server.use(
+      http.post('*/a/changes/12345/reviewers', async ({ request }) => {
+        const body = (await request.json()) as { reviewer: string; state?: string }
+        expect(body.reviewer).toBe('administrators')
+        expect(body.state).toBe('CC')
+        return HttpResponse.text(
+          `)]}'\n${JSON.stringify({
+            input: 'administrators',
+            ccs: [
+              {
+                _account_id: 4001,
+                name: 'Admin User',
+                email: 'admin@example.com',
+              },
+            ],
+          })}`,
+        )
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = addReviewerCommand(['administrators'], {
+      change: '12345',
+      group: true,
+      cc: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    await Effect.runPromise(program)
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('Added Admin User as cc')
+  })
+
+  it('should show error when no groups provided with --group flag', async () => {
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = addReviewerCommand([], {
+      change: '12345',
+      group: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    const result = await Effect.runPromiseExit(program)
+    expect(result._tag).toBe('Failure')
+
+    const errorOutput = mockConsoleError.mock.calls.map((call) => call[0]).join('\n')
+    expect(errorOutput).toContain('At least one group is required')
+  })
+
+  it('should output XML format with --group flag', async () => {
+    server.use(
+      http.post('*/a/changes/12345/reviewers', async () => {
+        return HttpResponse.text(
+          `)]}'\n${JSON.stringify({
+            input: 'project-reviewers',
+            reviewers: [
+              {
+                _account_id: 3001,
+                name: 'Alice Developer',
+                email: 'alice@example.com',
+              },
+            ],
+          })}`,
+        )
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = addReviewerCommand(['project-reviewers'], {
+      change: '12345',
+      group: true,
+      xml: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    await Effect.runPromise(program)
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('<?xml version="1.0" encoding="UTF-8"?>')
+    expect(output).toContain('<add_reviewer_result>')
+    expect(output).toContain('<change_id>12345</change_id>')
+    expect(output).toContain('<state>REVIEWER</state>')
+    expect(output).toContain('<entity_type>group</entity_type>')
+    expect(output).toContain('<reviewer status="added">')
+    expect(output).toContain('<input>project-reviewers</input>')
+    expect(output).toContain('<name><![CDATA[Alice Developer]]></name>')
+    expect(output).toContain('<status>success</status>')
+  })
+
+  it('should handle group not found error', async () => {
+    server.use(
+      http.post('*/a/changes/12345/reviewers', async () => {
+        return HttpResponse.text(
+          `)]}'\n${JSON.stringify({
+            input: 'nonexistent-group',
+            error: 'Group nonexistent-group not found',
+          })}`,
+        )
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = addReviewerCommand(['nonexistent-group'], {
+      change: '12345',
+      group: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    await Effect.runPromise(program)
+
+    const errorOutput = mockConsoleError.mock.calls.map((call) => call[0]).join('\n')
+    expect(errorOutput).toContain('Failed to add nonexistent-group')
+    expect(errorOutput).toContain('Group nonexistent-group not found')
+  })
+
+  it('should reject email-like input when --group flag is used', async () => {
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = addReviewerCommand(['user@example.com'], {
+      change: '12345',
+      group: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    const result = await Effect.runPromiseExit(program)
+    expect(result._tag).toBe('Failure')
+
+    const errorOutput = mockConsoleError.mock.calls.map((call) => call[0]).join('\n')
+    expect(errorOutput).toContain('The --group flag expects group identifiers')
+    expect(errorOutput).toContain('user@example.com')
+    expect(errorOutput).toContain('Did you mean to omit --group?')
+  })
+
+  it('should reject email-like input in XML mode when --group flag is used', async () => {
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = addReviewerCommand(['admin@example.com', 'test@example.com'], {
+      change: '12345',
+      group: true,
+      xml: true,
+    }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(mockConfigLayer))
+
+    const result = await Effect.runPromiseExit(program)
+    expect(result._tag).toBe('Failure')
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    expect(output).toContain('<add_reviewer_result>')
+    expect(output).toContain('<status>error</status>')
+    expect(output).toContain('<error><![CDATA[')
+    expect(output).toContain('admin@example.com')
+    expect(output).toContain('test@example.com')
   })
 })

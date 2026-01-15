@@ -41,7 +41,36 @@ ger comments 12350
 # (make local changes, commit, push)
 git add .
 git commit --amend
-git push origin HEAD:refs/for/main
+ger push
+```
+
+### Working with Work-in-Progress Changes (Optional)
+
+If you want to push changes that aren't ready for review yet, you can use WIP:
+
+```bash
+# Push as WIP (won't notify reviewers)
+ger push --wip
+
+# Continue working and updating
+git add .
+git commit --amend
+ger push --wip
+
+# When ready for review
+ger push --ready
+```
+
+Search for WIP changes:
+```bash
+# Find all WIP changes
+ger search "is:wip"
+
+# Your WIP changes only
+ger search "owner:self is:wip"
+
+# Combine with other filters
+ger search "owner:self is:wip project:my-project"
 ```
 
 ## Advanced Review Workflows
@@ -86,6 +115,76 @@ for id in 12345 12346 12347; do
   ger comments $id --unresolved-only
   echo "---"
 done
+```
+
+### Managing Team Reviewers with Groups
+
+Find and manage reviewer groups for your changes:
+
+```bash
+# Find all available groups
+ger groups
+
+# Find groups for your project
+ger groups --project my-project
+
+# Search for specific team groups
+ger groups --pattern "^team-.*"
+
+# View who's in a reviewer group before adding
+ger groups-show project-reviewers
+ger groups-members project-reviewers
+
+# Add entire team as reviewers
+ger add-reviewer --group project-reviewers -c 12345
+
+# Add admin group as CC for visibility
+ger add-reviewer --group administrators --cc -c 12345
+
+# Add multiple groups
+ger add-reviewer --group frontend-team -c 12345
+ger add-reviewer --group backend-team -c 12345
+```
+
+**Practical workflow for finding the right reviewers:**
+
+```bash
+# Step 1: Find groups for your project
+ger groups --project canvas-lms --pattern ".*-reviewers"
+
+# Step 2: Check who's in the group
+ger groups-show canvas-frontend-reviewers
+
+# Step 3: Add the group to your change
+ger add-reviewer --group canvas-frontend-reviewers -c 12345
+
+# Step 4: Verify they were added (check the change)
+ger show 12345
+```
+
+**Automation example - add reviewers based on file changes:**
+
+```bash
+#!/bin/bash
+# auto-add-reviewers.sh
+
+CHANGE_ID=$1
+
+# Get the list of changed files
+FILES=$(ger diff $CHANGE_ID --files-only)
+
+# Add appropriate team based on files
+if echo "$FILES" | grep -q "^src/api/"; then
+  ger add-reviewer --group api-team -c $CHANGE_ID
+fi
+
+if echo "$FILES" | grep -q "^src/frontend/"; then
+  ger add-reviewer --group frontend-team -c $CHANGE_ID
+fi
+
+if echo "$FILES" | grep -q "^db/migrations/"; then
+  ger add-reviewer --group database-team -c $CHANGE_ID
+fi
 ```
 
 ## AI-Assisted Code Review

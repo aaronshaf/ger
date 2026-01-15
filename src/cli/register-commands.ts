@@ -29,6 +29,7 @@ import { showCommand, SHOW_HELP_TEXT } from './commands/show'
 import { statusCommand } from './commands/status'
 import { workspaceCommand } from './commands/workspace'
 import { sanitizeCDATA } from '@/utils/shell-safety'
+import { registerGroupCommands } from './register-group-commands'
 
 // Helper function to output error in plain text or XML format
 function outputError(error: unknown, options: { xml?: boolean }, resultTag: string): void {
@@ -338,9 +339,10 @@ Note:
   // add-reviewer command
   program
     .command('add-reviewer <reviewers...>')
-    .description('Add reviewers to a change')
+    .description('Add reviewers or groups to a change')
     .option('-c, --change <change-id>', 'Change ID (required until auto-detection is implemented)')
     .option('--cc', 'Add as CC instead of reviewer')
+    .option('--group', 'Add as group instead of individual reviewer')
     .option(
       '--notify <level>',
       'Notification level: none, owner, owner_reviewers, all (default: all)',
@@ -353,6 +355,8 @@ Examples:
   $ ger add-reviewer user@example.com -c 12345          # Add a reviewer
   $ ger add-reviewer user1@example.com user2@example.com -c 12345  # Multiple
   $ ger add-reviewer --cc user@example.com -c 12345     # Add as CC
+  $ ger add-reviewer --group project-reviewers -c 12345 # Add a group
+  $ ger add-reviewer --group admins --cc -c 12345       # Add group as CC
   $ ger add-reviewer --notify none user@example.com -c 12345  # No email`,
     )
     .action(async (reviewers, options) => {
@@ -382,6 +386,9 @@ Examples:
         'projects_result',
       )
     })
+
+  // Register all group-related commands
+  registerGroupCommands(program)
 
   // comments command
   program

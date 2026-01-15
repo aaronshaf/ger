@@ -60,6 +60,56 @@ ger abandon [change-id]
 ```
 Mark a change as abandoned.
 
+### Pushing Changes
+
+**Push changes to Gerrit:**
+```bash
+ger push
+```
+
+**Push with options:**
+```bash
+# Push to specific branch
+ger push -b main
+
+# Push with topic
+ger push -t my-feature
+
+# Push with reviewers
+ger push -r alice@example.com -r bob@example.com
+
+# Push as work-in-progress (WIP)
+ger push --wip
+
+# Mark change as ready for review
+ger push --ready
+
+# Combine options
+ger push -b main -t feature-auth -r alice@example.com --wip
+```
+
+**WIP Workflow (Optional):**
+Work-in-progress changes are useful when you want to push changes that aren't ready for review:
+```bash
+# Push initial work as WIP (won't notify reviewers)
+ger push --wip
+
+# Continue updating (stays WIP)
+ger push --wip
+
+# Mark ready when done (will notify reviewers)
+ger push --ready
+```
+
+**Search for WIP changes:**
+```bash
+# Find all WIP changes
+ger search "is:wip"
+
+# Your WIP changes
+ger search "owner:self is:wip"
+```
+
 ### Commenting on Changes
 
 **Post a comment:**
@@ -111,6 +161,46 @@ Use the ger CLI with AI tools for enhanced code review:
    ai-tool analyze /tmp/review.diff | ger comment [change-id]
    ```
 
+### Work-in-Progress (WIP) Workflow (Optional)
+
+If you need to push changes that aren't ready for review, you can use the WIP flag:
+
+1. **Start with WIP:**
+   ```bash
+   # Make changes
+   git add .
+   git commit -m "feat: add new feature"
+
+   # Push as WIP (won't notify reviewers)
+   ger push --wip
+   ```
+
+2. **Continue iterating:**
+   ```bash
+   # Make more changes
+   git add .
+   git commit --amend
+
+   # Push updates (stays WIP)
+   ger push --wip
+   ```
+
+3. **Mark ready when complete:**
+   ```bash
+   # Final polish
+   git add .
+   git commit --amend
+
+   # Mark ready for review (notifies reviewers)
+   ger push --ready
+   ```
+
+4. **Find WIP changes:**
+   ```bash
+   # List all your WIP changes
+   ger search "owner:self is:wip"
+   ```
+
 ## Best Practices
 
 ### When Reviewing Code
@@ -126,6 +216,7 @@ Use the ger CLI with AI tools for enhanced code review:
 2. **Respond to comments promptly** - address reviewer feedback
 3. **Use meaningful commit messages** - follow conventional commit format
 4. **Test before submitting** - ensure builds pass before requesting review
+5. **Consider WIP flag (optional)** - use `--wip` for changes not ready for review
 
 ## Troubleshooting
 

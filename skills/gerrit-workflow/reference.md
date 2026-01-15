@@ -207,6 +207,142 @@ ger checkout 12345
 ger checkout 12345 --revision 3
 ```
 
+### push
+
+Push changes to Gerrit for review.
+
+**Syntax:**
+```bash
+ger push [options]
+```
+
+**Options:**
+- `-b, --branch <branch>` - Target branch (auto-detected from tracking branch)
+- `-t, --topic <topic>` - Topic name
+- `-r, --reviewer <email>` - Add reviewer (can be repeated)
+- `--cc <email>` - Add CC (can be repeated)
+- `--wip` - Mark as work-in-progress (not ready for review)
+- `--ready` - Mark as ready for review (remove WIP status)
+- `--hashtag <tag>` - Add hashtag (can be repeated)
+- `--private` - Mark as private change
+- `--draft` - Alias for --wip
+- `--dry-run` - Preview push without actually pushing
+
+**Examples:**
+```bash
+# Basic push to auto-detected branch
+ger push
+
+# Push to specific branch
+ger push -b main
+ger push --branch feature/auth
+
+# Push with topic
+ger push -t my-feature
+
+# Push with reviewers
+ger push -r alice@example.com -r bob@example.com
+
+# Push with CC
+ger push --cc manager@example.com
+
+# Push as work-in-progress (WIP)
+ger push --wip
+
+# Mark change as ready for review
+ger push --ready
+
+# Add hashtag
+ger push --hashtag bugfix
+
+# Combine multiple options
+ger push -b main -t refactor-auth -r alice@example.com --wip
+
+# Preview push without executing
+ger push --dry-run
+```
+
+**WIP Workflow:**
+Work-in-progress changes are useful for getting early feedback or saving work:
+```bash
+# Push initial work as WIP
+ger push --wip
+
+# Continue updating (stays WIP)
+ger push --wip
+
+# Mark ready when complete
+ger push --ready
+```
+
+**Features:**
+- Auto-installs commit-msg hook if missing
+- Auto-detects target branch from tracking branch or defaults to main/master
+- Validates reviewer email addresses
+- Returns change URL on successful push
+
+### search
+
+Search for changes using Gerrit query syntax.
+
+**Syntax:**
+```bash
+ger search [query] [options]
+```
+
+**Options:**
+- `-n, --limit <n>` - Maximum number of results (default: 25)
+- `--format <format>` - Output format: `table`, `json`, `list`
+- `--xml` - XML output for automation
+
+**Common Query Operators:**
+- `owner:USER` - Changes owned by USER (use 'self' for yourself)
+- `status:STATE` - open, merged, abandoned, closed
+- `project:NAME` - Changes in a specific project
+- `branch:NAME` - Changes targeting a branch
+- `age:TIME` - Time since last update (e.g., 1d, 2w, 1mon)
+- `before:DATE` - Changes modified before date (YYYY-MM-DD)
+- `after:DATE` - Changes modified after date (YYYY-MM-DD)
+- `is:wip` - Work-in-progress changes
+- `is:submittable` - Changes ready to submit
+- `reviewer:USER` - Changes where USER is a reviewer
+- `label:NAME=VALUE` - Filter by label (e.g., label:Code-Review+2)
+
+**Examples:**
+```bash
+# Search for all open changes (default)
+ger search
+
+# Search for your open changes
+ger search "owner:self status:open"
+
+# Search for changes by a specific user
+ger search "owner:john@example.com"
+
+# Search by project
+ger search "project:my-project status:open"
+
+# Search with date filters
+ger search "owner:self after:2025-01-01"
+ger search "status:merged age:7d"
+
+# Search for WIP changes
+ger search "is:wip"
+ger search "owner:self is:wip"
+
+# Search for submittable changes
+ger search "is:submittable"
+
+# Combine filters
+ger search "owner:self status:merged before:2025-06-01"
+
+# Limit results
+ger search "project:my-project" -n 10
+
+# XML output for automation
+ger search "owner:self" --xml
+```
+
 ## Commenting Commands
 
 ### comment
@@ -331,6 +467,165 @@ ger config get gerrit.url
 # List all config
 ger config list
 ```
+
+## Groups and Reviewers Commands
+
+### add-reviewer
+
+Add reviewers, groups, or CCs to a change.
+
+**Syntax:**
+```bash
+ger add-reviewer <reviewers...> -c <change-id> [options]
+```
+
+**Options:**
+- `-c, --change <id>` - Change ID (required)
+- `--group` - Add as group instead of individual reviewer
+- `--cc` - Add as CC instead of reviewer
+- `--notify <level>` - Notification level: `none`, `owner`, `owner_reviewers`, `all`
+- `--xml` - XML output for automation
+
+**Examples:**
+```bash
+# Add individual reviewers
+ger add-reviewer user@example.com -c 12345
+ger add-reviewer user1@example.com user2@example.com -c 12345
+
+# Add a group as reviewer
+ger add-reviewer --group project-reviewers -c 12345
+
+# Add a group as CC
+ger add-reviewer --group administrators --cc -c 12345
+
+# Add as CC instead of reviewer
+ger add-reviewer --cc user@example.com -c 12345
+
+# Suppress notifications
+ger add-reviewer --notify none user@example.com -c 12345
+
+# XML output
+ger add-reviewer user@example.com -c 12345 --xml
+```
+
+### groups
+
+List and search Gerrit groups.
+
+**Syntax:**
+```bash
+ger groups [options]
+```
+
+**Options:**
+- `--pattern <regex>` - Filter groups by name pattern
+- `--owned` - Show only groups you own
+- `--project <name>` - Show groups for a specific project
+- `--user <account>` - Show groups a user belongs to
+- `--limit <n>` - Limit results (default: 25)
+- `--xml` - XML output for automation
+
+**Examples:**
+```bash
+# List all groups
+ger groups
+
+# Filter by pattern
+ger groups --pattern "^project-.*"
+
+# Show only owned groups
+ger groups --owned
+
+# Show groups for a project
+ger groups --project my-project
+
+# Limit results
+ger groups --limit 50
+
+# XML output
+ger groups --xml
+```
+
+**Output includes:**
+- Group name and ID
+- Description
+- Owner group
+- Visibility settings
+- Creation date (when available)
+
+### groups-show
+
+Show detailed information about a specific group.
+
+**Syntax:**
+```bash
+ger groups-show <group-id> [options]
+```
+
+**Options:**
+- `--xml` - XML output for automation
+
+**Group ID formats:**
+- Group name: `administrators`
+- Numeric ID: `1`
+- UUID: `uuid-123456`
+
+**Examples:**
+```bash
+# Show by name
+ger groups-show administrators
+
+# Show by numeric ID
+ger groups-show 1
+
+# Show by UUID
+ger groups-show uuid-123456
+
+# XML output
+ger groups-show administrators --xml
+```
+
+**Output includes:**
+- Basic group information (name, ID, owner, description)
+- Visibility settings
+- All group members with details
+- Subgroups (included groups)
+- Metadata (creation date, group ID)
+
+### groups-members
+
+List all members of a group.
+
+**Syntax:**
+```bash
+ger groups-members <group-id> [options]
+```
+
+**Options:**
+- `--xml` - XML output for automation
+
+**Examples:**
+```bash
+# List members
+ger groups-members project-reviewers
+
+# List members by numeric ID
+ger groups-members 1
+
+# XML output
+ger groups-members project-reviewers --xml
+```
+
+**Output includes:**
+- Member name
+- Email address
+- Username
+- Account ID
+
+**Notes:**
+- All group commands are read-only
+- Group operations do not support creating, modifying, or deleting groups
+- Use with `add-reviewer --group` to add teams as reviewers
 
 ## Global Options
 

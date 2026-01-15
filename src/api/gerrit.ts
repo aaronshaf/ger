@@ -14,6 +14,9 @@ import {
   ReviewerResult,
   RevisionInfo,
   SubmitInfo,
+  GroupInfo,
+  GroupDetailInfo,
+  AccountInfo,
 } from '@/schemas/gerrit'
 import { filterMeaningfulMessages } from '@/utils/message-filters'
 import { ConfigService } from '@/services/config'
@@ -71,6 +74,17 @@ export interface GerritApiServiceImpl {
     reviewer: string,
     options?: { state?: 'REVIEWER' | 'CC'; notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL' },
   ) => Effect.Effect<ReviewerResult, ApiError>
+  readonly listGroups: (options?: {
+    owned?: boolean
+    project?: string
+    user?: string
+    pattern?: string
+    limit?: number
+    skip?: number
+  }) => Effect.Effect<readonly GroupInfo[], ApiError>
+  readonly getGroup: (groupId: string) => Effect.Effect<GroupInfo, ApiError>
+  readonly getGroupDetail: (groupId: string) => Effect.Effect<GroupDetailInfo, ApiError>
+  readonly getGroupMembers: (groupId: string) => Effect.Effect<readonly AccountInfo[], ApiError>
 }
 
 // Export both the tag value and the type for use in Effect requirements
@@ -561,6 +575,79 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           return yield* makeRequest(url, authHeader, 'POST', body, ReviewerResult)
         })
 
+      const listGroups = (options?: {
+        owned?: boolean
+        project?: string
+        user?: string
+        pattern?: string
+        limit?: number
+        skip?: number
+      }) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          let url = `${credentials.host}/a/groups/`
+          const params: string[] = []
+
+          if (options?.owned) {
+            params.push('owned')
+          }
+          if (options?.project) {
+            params.push(`p=${encodeURIComponent(options.project)}`)
+          }
+          if (options?.user) {
+            params.push(`user=${encodeURIComponent(options.user)}`)
+          }
+          if (options?.pattern) {
+            params.push(`r=${encodeURIComponent(options.pattern)}`)
+          }
+          if (options?.limit) {
+            params.push(`n=${options.limit}`)
+          }
+          if (options?.skip) {
+            params.push(`S=${options.skip}`)
+          }
+
+          if (params.length > 0) {
+            url += `?${params.join('&')}`
+          }
+
+          // Gerrit returns groups as a Record, need to convert to array
+          const groupsRecord = yield* makeRequest(
+            url,
+            authHeader,
+            'GET',
+            undefined,
+            Schema.Record({ key: Schema.String, value: GroupInfo }),
+          )
+          // Convert Record to Array and sort alphabetically by name
+          return Object.values(groupsRecord).sort((a, b) => {
+            const aName = a.name || a.id
+            const bName = b.name || b.id
+            return aName.localeCompare(bName)
+          })
+        })
+
+      const getGroup = (groupId: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const url = `${credentials.host}/a/groups/${encodeURIComponent(groupId)}`
+          return yield* makeRequest(url, authHeader, 'GET', undefined, GroupInfo)
+        })
+
+      const getGroupDetail = (groupId: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const url = `${credentials.host}/a/groups/${encodeURIComponent(groupId)}/detail`
+          return yield* makeRequest(url, authHeader, 'GET', undefined, GroupDetailInfo)
+        })
+
+      const getGroupMembers = (groupId: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const url = `${credentials.host}/a/groups/${encodeURIComponent(groupId)}/members/`
+          return yield* makeRequest(url, authHeader, 'GET', undefined, Schema.Array(AccountInfo))
+        })
+
       return {
         getChange,
         listChanges,
@@ -580,6 +667,10 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         getComments,
         getMessages,
         addReviewer,
+        listGroups,
+        getGroup,
+        getGroupDetail,
+        getGroupMembers,
       }
     }),
   )

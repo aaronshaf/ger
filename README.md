@@ -590,7 +590,7 @@ ger projects --xml
 
 ### Add Reviewers
 
-Add reviewers or CCs to a change:
+Add reviewers, groups, or CCs to a change:
 
 ```bash
 # Add a single reviewer
@@ -598,6 +598,12 @@ ger add-reviewer user@example.com -c 12345
 
 # Add multiple reviewers
 ger add-reviewer user1@example.com user2@example.com -c 12345
+
+# Add a group as reviewer
+ger add-reviewer --group project-reviewers -c 12345
+
+# Add a group as CC
+ger add-reviewer --group administrators --cc -c 12345
 
 # Add as CC instead of reviewer
 ger add-reviewer --cc user@example.com -c 12345
@@ -611,14 +617,75 @@ ger add-reviewer user@example.com -c 12345 --xml
 
 #### Options:
 - `-c, --change <id>` - Change ID (required)
+- `--group` - Add as group instead of individual reviewer
 - `--cc` - Add as CC instead of reviewer
 - `--notify <level>` - Notification level: `none`, `owner`, `owner_reviewers`, `all` (default: `all`)
 - `--xml` - XML output for LLM/automation consumption
 
 #### Notes:
-- Both email addresses and usernames are accepted
-- Multiple reviewers can be added in a single command
+- Both email addresses and usernames are accepted for individual reviewers
+- Group names/IDs can be used with the `--group` flag
+- Multiple reviewers or groups can be added in a single command
 - Use `--cc` for carbon copy (notified but not required to review)
+
+### Groups
+
+List, view, and query Gerrit groups:
+
+```bash
+# List all groups
+ger groups
+
+# Filter by pattern (regex)
+ger groups --pattern "^project-.*"
+
+# Show only groups you own
+ger groups --owned
+
+# Show groups for a specific project
+ger groups --project my-project
+
+# Limit results
+ger groups --limit 50
+
+# Show detailed group information
+ger groups-show administrators
+
+# Show group by numeric ID or UUID
+ger groups-show 1
+ger groups-show uuid-123456
+
+# List all members of a group
+ger groups-members project-reviewers
+
+# XML output for automation
+ger groups --xml
+ger groups-show administrators --xml
+ger groups-members project-reviewers --xml
+```
+
+#### Commands:
+- `ger groups` - List and search groups
+  - `--pattern <regex>` - Filter groups by name pattern
+  - `--owned` - Show only groups you own
+  - `--project <name>` - Show groups for a specific project
+  - `--user <account>` - Show groups a user belongs to
+  - `--limit <n>` - Limit results (default: 25)
+  - `--xml` - XML output
+
+- `ger groups-show <group-id>` - Show detailed group information
+  - Accepts group name, numeric ID, or UUID
+  - Shows members, subgroups, owner, and metadata
+  - `--xml` - XML output
+
+- `ger groups-members <group-id>` - List all members of a group
+  - Shows member names, emails, usernames, and account IDs
+  - `--xml` - XML output
+
+#### Notes:
+- All group commands provide read-only access
+- Group IDs can be names, numeric IDs, or UUIDs
+- Use groups with `ger add-reviewer --group` to add entire teams as reviewers
 
 ### AI-Powered Review
 

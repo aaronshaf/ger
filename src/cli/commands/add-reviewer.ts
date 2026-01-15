@@ -6,6 +6,7 @@ interface AddReviewerOptions {
   cc?: boolean
   notify?: string
   xml?: boolean
+  group?: boolean
 }
 
 type NotifyLevel = 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL'
@@ -48,7 +49,8 @@ export const addReviewerCommand = (
     }
 
     if (reviewers.length === 0) {
-      const message = 'At least one reviewer is required.'
+      const entityType = options.group ? 'group' : 'reviewer'
+      const message = `At least one ${entityType} is required.`
       if (options.xml) {
         outputXmlError(message)
       } else {
@@ -57,8 +59,26 @@ export const addReviewerCommand = (
       return yield* Effect.fail(new ValidationError(message))
     }
 
+    // Validate that email-like inputs aren't used with --group flag
+    // Note: This uses a simple heuristic (presence of '@') to detect likely email addresses.
+    // While Gerrit group names could theoretically contain '@', this is rare in practice
+    // and the validation serves as a helpful UX guardrail against common mistakes.
+    if (options.group) {
+      const emailLikeInputs = reviewers.filter((r) => r.includes('@'))
+      if (emailLikeInputs.length > 0) {
+        const message = `The --group flag expects group identifiers, but received email-like input: ${emailLikeInputs.join(', ')}. Did you mean to omit --group?`
+        if (options.xml) {
+          outputXmlError(message)
+        } else {
+          console.error(`✗ ${message}`)
+        }
+        return yield* Effect.fail(new ValidationError(message))
+      }
+    }
+
     const state: 'REVIEWER' | 'CC' = options.cc ? 'CC' : 'REVIEWER'
-    const stateLabel = options.cc ? 'cc' : 'reviewer'
+    const entityType = options.group ? 'group' : 'individual'
+    const stateLabel = options.cc ? 'cc' : options.group ? 'group' : 'reviewer'
 
     let notify: NotifyLevel | undefined
     if (options.notify) {
@@ -104,7 +124,8 @@ export const addReviewerCommand = (
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<add_reviewer_result>`)
       console.log(`  <change_id>${escapeXml(changeId)}</change_id>`)
-      console.log(`  <state>${escapeXml(stateLabel)}</state>`)
+      console.log(`  <state>${escapeXml(state)}</state>`)
+      console.log(`  <entity_type>${escapeXml(entityType)}</entity_type>`)
       console.log(`  <reviewers>`)
       for (const r of results) {
         if (r.success) {
