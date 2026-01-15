@@ -46,14 +46,24 @@ ger incoming
 # View a specific change
 ger show 12345
 
+# Checkout a change for local testing
+ger checkout 12345
+
 # Add a comment
 ger comment 12345 -m "LGTM"
+
+# Vote on a change
+ger vote 12345 --code-review 2 -m "LGTM"
 
 # Add reviewers to a change
 ger add-reviewer user@example.com -c 12345
 
 # Get diff for review
 ger diff 12345
+
+# Push your changes for review
+ger push
+ger push -r alice@example.com -t my-feature --wip
 
 # Search for changes using Gerrit query syntax
 ger search "owner:self status:open"
@@ -69,6 +79,11 @@ ger build-status        # Auto-detects from HEAD commit
 # Watch build status until completion (like gh run watch)
 ger build-status 12345 --watch
 ger build-status --watch --exit-status && deploy.sh
+
+# Rebase, submit, restore changes
+ger rebase 12345
+ger submit 12345
+ger restore 12345
 
 # AI-powered code review (requires claude, llm, or opencode CLI)
 ger review 12345
@@ -405,14 +420,173 @@ ger diff 12345 --file src/main.ts
 ```
 
 ### Change Management
-```bash
-# Open in browser
-ger open 12345
 
-# Abandon
-ger abandon 12345
-ger abandon 12345 -m "Reason"
+#### Checkout Changes
+```bash
+# Checkout latest patchset
+ger checkout 12345
+
+# Checkout specific patchset
+ger checkout 12345/3
+
+# Checkout by Change-ID
+ger checkout If5a3ae8cb5a107e187447802358417f311d0c4b1
+
+# Checkout from URL
+ger checkout https://gerrit.example.com/c/my-project/+/392385
+
+# Detached HEAD mode (for quick review)
+ger checkout 12345 --detach
+
+# Use specific remote
+ger checkout 12345 --remote upstream
 ```
+
+**How it works:**
+- Creates/updates branch named `review/<change-number>`
+- Sets upstream tracking to target branch
+- Updates existing review branch if it exists
+- Auto-detects Gerrit remote matching your configured host
+
+#### Push Changes to Gerrit
+```bash
+# Basic push to auto-detected target branch
+ger push
+
+# Push to specific branch
+ger push -b master
+ger push --branch feature/foo
+
+# With topic
+ger push -t my-feature
+
+# With reviewers (can be repeated)
+ger push -r alice@example.com -r bob@example.com
+
+# With CC
+ger push --cc manager@example.com
+
+# Work in progress
+ger push --wip
+
+# Mark ready for review
+ger push --ready
+
+# Add hashtag
+ger push --hashtag bugfix
+
+# Combine options
+ger push -b master -t refactor-auth -r alice@example.com --wip
+
+# Dry run (show what would be pushed)
+ger push --dry-run
+```
+
+**Features:**
+- Auto-installs commit-msg hook if missing
+- Auto-detects target branch from tracking branch or defaults to main/master
+- Supports all standard Gerrit push options
+- Validates reviewer email addresses
+- Returns change URL on successful push
+
+#### Vote on Changes
+```bash
+# Cast Code-Review vote
+ger vote 12345 --code-review 2
+
+# Cast Verified vote
+ger vote 12345 --verified 1
+
+# Combine votes with message
+ger vote 12345 --code-review 2 --verified 1 -m "LGTM"
+
+# Custom labels
+ger vote 12345 --label "API-Review" 1
+
+# XML output for automation
+ger vote 12345 --code-review 1 --xml
+```
+
+**Common votes:**
+- Code-Review: -2, -1, 0, +1, +2
+- Verified: -1, 0, +1
+- Custom labels vary by project configuration
+
+#### Rebase Changes
+```bash
+# Rebase onto target branch HEAD
+ger rebase 12345
+
+# Rebase onto specific base
+ger rebase 12345 --base refs/heads/main
+
+# XML output
+ger rebase 12345 --xml
+```
+
+#### Submit Changes
+```bash
+# Submit change for merging
+ger submit 12345
+
+# XML output
+ger submit 12345 --xml
+```
+
+**Pre-submission checks:**
+- Verifies change status is NEW
+- Checks for required approvals (Code-Review+2, Verified+1)
+- Ensures change is not work-in-progress
+- Validates all submit requirements are met
+
+#### Restore Abandoned Changes
+```bash
+# Restore an abandoned change
+ger restore 12345
+
+# Restore with message
+ger restore 12345 -m "Reopening after discussion"
+
+# XML output
+ger restore 12345 --xml
+```
+
+#### Abandon Changes
+```bash
+# Abandon interactively (prompts for selection)
+ger abandon
+
+# Abandon specific change
+ger abandon 12345
+
+# Abandon with reason
+ger abandon 12345 -m "Duplicate of #12346"
+```
+
+#### Open in Browser
+```bash
+# Open change in browser
+ger open 12345
+```
+
+### Projects
+
+List and filter Gerrit projects:
+
+```bash
+# List all projects
+ger projects
+
+# Filter by pattern (regex)
+ger projects --pattern "^canvas-.*"
+
+# XML output for automation
+ger projects --xml
+```
+
+**Output:**
+- Plain text: One project name per line (default)
+- XML: Structured output with project details (id, name, parent, state)
 
 ### Add Reviewers
 
