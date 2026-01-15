@@ -86,6 +86,8 @@
 - src/i18n/ - Internationalization
 - tests/ - All test files
 - scripts/ - Build and hook scripts
+- docs/adr/ - Architecture Decision Records
+- docs/prd/ - Product Requirements Documents
 
 ### Performance
 - **IMPLEMENT** efficient caching strategies
