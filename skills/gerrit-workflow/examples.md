@@ -166,12 +166,12 @@ ger build-status 12345
 # Wait for build to complete
 ger build-status 12345 --watch --timeout 1800
 
-# Get build failures
-ger extract-url "build-summary-report" 12345 | tail -1 | jk failures --smart --xml
+# Extract build URL
+ger extract-url "build-summary-report" 12345 | tail -1
 
-# Complete workflow: wait for build, then get failures
+# Complete workflow: wait for build, then extract URL
 ger build-status 12345 --watch --interval 20 --timeout 1800 && \
-  ger extract-url "build-summary-report" 12345 | tail -1 | jk failures --smart --xml
+  ger extract-url "build-summary-report" 12345 | tail -1
 ```
 
 ### Automated Build Status Notifications
@@ -193,8 +193,8 @@ if ger build-status $CHANGE_ID --watch --timeout 3600; then
   MESSAGE="Build passed for change $CHANGE_ID"
 else
   STATUS="FAILURE"
-  FAILURES=$(ger extract-url "build-summary-report" $CHANGE_ID | tail -1 | jk failures --smart)
-  MESSAGE="Build failed for change $CHANGE_ID:\n$FAILURES"
+  BUILD_URL=$(ger extract-url "build-summary-report" $CHANGE_ID | tail -1)
+  MESSAGE="Build failed for change $CHANGE_ID. See: $BUILD_URL"
 fi
 
 # Send notification
@@ -259,55 +259,6 @@ for CHANGE in $CHANGES; do
 done
 ```
 
-## Project-Specific Workflows
-
-### Canvas (Instructure) Workflow
-
-For Canvas developers using ger with Jenkins:
-
-```bash
-# Check your open Canvas changes
-ger mine
-
-# Submit new change
-git push origin HEAD:refs/for/main
-
-# Monitor Jenkins build
-ger build-status --watch --interval 20 --timeout 1800
-
-# Get build failures (Canvas-specific)
-ger extract-url "build-summary-report" | tail -1 | jk failures --smart --xml
-
-# If build passes, get final review
-ger show
-
-# Address review comments, amend, and push new patchset
-git commit --amend
-git push origin HEAD:refs/for/main
-```
-
-### Integration with Jira
-
-Link Gerrit changes to Jira issues:
-
-```bash
-#!/bin/bash
-# link-jira.sh
-
-CHANGE_ID=$1
-JIRA_KEY=$2
-
-# Get change subject
-SUBJECT=$(ger show $CHANGE_ID --format json | jq -r '.subject')
-
-# Add comment to Jira issue
-ji comment $JIRA_KEY -m "Code review in progress: $SUBJECT
-Gerrit change: $CHANGE_ID
-Status: Open"
-
-echo "Linked change $CHANGE_ID to Jira issue $JIRA_KEY"
-```
-
 ## Troubleshooting Scenarios
 
 ### Debugging Failed Builds
@@ -321,25 +272,8 @@ ger build-status 12345
 # Get build summary URL
 BUILD_URL=$(ger extract-url "build-summary-report" 12345 | tail -1)
 
-# Get detailed failures
-echo $BUILD_URL | jk failures --smart --xml > /tmp/failures.xml
-
-# Get test results
-echo $BUILD_URL | jk test-results > /tmp/test-results.txt
-
-# View specific test failure
-cat /tmp/test-results.txt | grep -A 10 "FAILED"
-
-# Post summary as comment
-cat > /tmp/build-comment.txt <<EOF
-Build failed. Summary:
-
-$(cat /tmp/failures.xml | head -20)
-
-Full results: $BUILD_URL
-EOF
-
-cat /tmp/build-comment.txt | ger comment 12345
+# Post build URL as comment
+ger comment 12345 -m "Build failed. See: $BUILD_URL"
 ```
 
 ### Resolving Merge Conflicts
@@ -479,11 +413,11 @@ grev() {
   [ -n "$comment" ] && ger comment $change_id -m "$comment"
 }
 
-# Check build and get failures
+# Check build and extract URL
 gbuild() {
   local change_id=$1
   ger build-status $change_id --watch && \
-    ger extract-url "build-summary-report" $change_id | tail -1 | jk failures --smart
+    ger extract-url "build-summary-report" $change_id | tail -1
 }
 
 # AI review shortcut

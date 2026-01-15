@@ -111,21 +111,6 @@ Use the ger CLI with AI tools for enhanced code review:
    ai-tool analyze /tmp/review.diff | ger comment [change-id]
    ```
 
-### Working with Jenkins Builds
-
-For Canvas repos (Instructure-specific):
-
-**Get build failures:**
-```bash
-ger extract-url "build-summary-report" | tail -1 | jk failures --smart --xml
-```
-
-**Wait for build and get failures:**
-```bash
-ger build-status --watch --interval 20 --timeout 1800 && \
-ger extract-url "build-summary-report" | tail -1 | jk failures --smart --xml
-```
-
 ## Best Practices
 
 ### When Reviewing Code
@@ -142,13 +127,6 @@ ger extract-url "build-summary-report" | tail -1 | jk failures --smart --xml
 3. **Use meaningful commit messages** - follow conventional commit format
 4. **Test before submitting** - ensure builds pass before requesting review
 
-### Integration with Other Tools
-
-The ger tool works well with:
-- **jk** (Jenkins CLI) - For CI/CD integration
-- **ji** (Jira CLI) - For issue tracking
-- **AI tools** - For automated code review and analysis
-
 ## Troubleshooting
 
 **Change not found:**
@@ -164,7 +142,7 @@ The ger tool works well with:
 **Build failures:**
 - Use `ger build-status` to monitor build progress
 - Extract build URLs with `ger extract-url`
-- Use `jk failures` to get detailed failure information
+- Check build logs for detailed failure information
 
 ## Additional Resources
 

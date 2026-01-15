@@ -299,8 +299,8 @@ ger extract-url "build-summary-report"
 # Extract for specific change
 ger extract-url "jenkins" 12345
 
-# Pipe to other tools
-ger extract-url "build-summary-report" | tail -1 | jk failures --smart --xml
+# Get the latest URL
+ger extract-url "build-summary-report" | tail -1
 ```
 
 ## Configuration Commands
