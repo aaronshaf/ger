@@ -275,20 +275,32 @@ export const checkoutCommand = (
     // 4. Get change details
     const change = yield* apiService.getChange(parsed.changeId)
 
-    // 5. Get revision details - handle patchset validation properly
-    const revision = yield* parsed.patchset
-      ? Effect.gen(function* () {
-          const patchsetNum = parsed.patchset
-          if (patchsetNum === undefined) {
-            return yield* Effect.fail(
-              new InvalidInputError('Patchset number is required but was undefined'),
-            )
-          }
-          return yield* apiService
-            .getRevision(parsed.changeId, patchsetNum.toString())
-            .pipe(Effect.catchAll(() => Effect.fail(new PatchsetNotFoundError(patchsetNum))))
-        })
-      : apiService.getRevision(parsed.changeId, 'current')
+    // 5. Get revision details - use from change if available, otherwise fetch separately
+    const revision = yield* Effect.gen(function* () {
+      // If requesting a specific patchset, always fetch it
+      if (parsed.patchset) {
+        const patchsetNum = parsed.patchset
+        if (patchsetNum === undefined) {
+          return yield* Effect.fail(
+            new InvalidInputError('Patchset number is required but was undefined'),
+          )
+        }
+        return yield* apiService
+          .getRevision(parsed.changeId, patchsetNum.toString())
+          .pipe(Effect.catchAll(() => Effect.fail(new PatchsetNotFoundError(patchsetNum))))
+      }
+
+      // For current revision, use it from change response if available
+      if (change.current_revision && change.revisions) {
+        const currentRevision = change.revisions[change.current_revision]
+        if (currentRevision) {
+          return currentRevision
+        }
+      }
+
+      // Fallback to fetching revision separately
+      return yield* apiService.getRevision(parsed.changeId, 'current')
+    })
 
     // 6. Validate inputs before using in shell commands
     const validatedRef = yield* validateGerritRef(revision.ref)

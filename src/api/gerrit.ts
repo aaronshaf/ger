@@ -205,7 +205,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
           const normalized = yield* normalizeAndValidate(changeId)
-          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}`
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}?o=CURRENT_REVISION&o=CURRENT_COMMIT`
           return yield* makeRequest(url, authHeader, 'GET', undefined, ChangeInfo)
         })
 

@@ -21,6 +21,50 @@ export const GerritCredentials: Schema.Schema<{
 })
 export type GerritCredentials = Schema.Schema.Type<typeof GerritCredentials>
 
+// Forward declare RevisionInfo type for use in ChangeInfo
+interface RevisionInfoType {
+  readonly kind?: string
+  readonly _number: number
+  readonly created: string
+  readonly uploader: {
+    readonly _account_id: number
+    readonly name?: string
+    readonly email?: string
+  }
+  readonly ref: string
+  readonly fetch?: Record<string, unknown>
+  readonly commit?: {
+    readonly commit: string
+    readonly parents: ReadonlyArray<{
+      readonly commit: string
+      readonly subject: string
+    }>
+    readonly author: {
+      readonly name: string
+      readonly email: string
+      readonly date: string
+    }
+    readonly committer: {
+      readonly name: string
+      readonly email: string
+      readonly date: string
+    }
+    readonly subject: string
+    readonly message: string
+  }
+  readonly files?: Record<
+    string,
+    {
+      readonly status?: 'A' | 'D' | 'R' | 'C' | 'M'
+      readonly lines_inserted?: number
+      readonly lines_deleted?: number
+      readonly size?: number
+      readonly size_delta?: number
+      readonly old_path?: string
+    }
+  >
+}
+
 // Change schemas
 export const ChangeInfo: Schema.Schema<{
   readonly id: string
@@ -72,6 +116,8 @@ export const ChangeInfo: Schema.Schema<{
   >
   readonly submittable?: boolean
   readonly work_in_progress?: boolean
+  readonly current_revision?: string
+  readonly revisions?: Record<string, RevisionInfoType>
 }> = Schema.Struct({
   id: Schema.String,
   project: Schema.String,
@@ -134,6 +180,8 @@ export const ChangeInfo: Schema.Schema<{
   ),
   submittable: Schema.optional(Schema.Boolean),
   work_in_progress: Schema.optional(Schema.Boolean),
+  current_revision: Schema.optional(Schema.String),
+  revisions: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })),
 })
 export type ChangeInfo = Schema.Schema.Type<typeof ChangeInfo>
 
