@@ -8,10 +8,12 @@ import {
   FileDiffContent,
   FileInfo,
   type GerritCredentials,
+  ProjectInfo,
   type ReviewInput,
   type ReviewerInput,
   ReviewerResult,
   RevisionInfo,
+  SubmitInfo,
 } from '@/schemas/gerrit'
 import { filterMeaningfulMessages } from '@/utils/message-filters'
 import { ConfigService } from '@/services/config'
@@ -20,8 +22,20 @@ import { normalizeChangeIdentifier } from '@/utils/change-id'
 export interface GerritApiServiceImpl {
   readonly getChange: (changeId: string) => Effect.Effect<ChangeInfo, ApiError>
   readonly listChanges: (query?: string) => Effect.Effect<readonly ChangeInfo[], ApiError>
+  readonly listProjects: (options?: {
+    pattern?: string
+  }) => Effect.Effect<readonly ProjectInfo[], ApiError>
   readonly postReview: (changeId: string, review: ReviewInput) => Effect.Effect<void, ApiError>
   readonly abandonChange: (changeId: string, message?: string) => Effect.Effect<void, ApiError>
+  readonly restoreChange: (
+    changeId: string,
+    message?: string,
+  ) => Effect.Effect<ChangeInfo, ApiError>
+  readonly rebaseChange: (
+    changeId: string,
+    options?: { base?: string },
+  ) => Effect.Effect<ChangeInfo, ApiError>
+  readonly submitChange: (changeId: string) => Effect.Effect<SubmitInfo, ApiError>
   readonly testConnection: Effect.Effect<boolean, ApiError>
   readonly getRevision: (
     changeId: string,
@@ -139,7 +153,8 @@ const makeRequest = <T = unknown>(
     const cleanJson = text.replace(/^\)\]\}'\n?/, '')
 
     if (!cleanJson.trim()) {
-      return null as unknown as T
+      // Empty response - return empty object for endpoints that expect void
+      return {} as T
     }
 
     const parsed = yield* Effect.try({
@@ -153,7 +168,8 @@ const makeRequest = <T = unknown>(
       )
     }
 
-    return parsed as unknown as T
+    // When no schema is provided, the caller expects void or doesn't care about the response
+    return parsed
   })
 
 export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigService> =
@@ -202,6 +218,25 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           return yield* makeRequest(url, authHeader, 'GET', undefined, Schema.Array(ChangeInfo))
         })
 
+      const listProjects = (options?: { pattern?: string }) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          let url = `${credentials.host}/a/projects/`
+          if (options?.pattern) {
+            url += `?p=${encodeURIComponent(options.pattern)}`
+          }
+          // Gerrit returns projects as a Record, need to convert to array
+          const projectsRecord = yield* makeRequest(
+            url,
+            authHeader,
+            'GET',
+            undefined,
+            Schema.Record({ key: Schema.String, value: ProjectInfo }),
+          )
+          // Convert Record to Array and sort alphabetically by name
+          return Object.values(projectsRecord).sort((a, b) => a.name.localeCompare(b.name))
+        })
+
       const postReview = (changeId: string, review: ReviewInput) =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
@@ -217,6 +252,32 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/abandon`
           const body = message ? { message } : {}
           yield* makeRequest(url, authHeader, 'POST', body)
+        })
+
+      const restoreChange = (changeId: string, message?: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/restore`
+          const body = message ? { message } : {}
+          return yield* makeRequest(url, authHeader, 'POST', body, ChangeInfo)
+        })
+
+      const rebaseChange = (changeId: string, options?: { base?: string }) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/current/rebase`
+          const body = options?.base ? { base: options.base } : {}
+          return yield* makeRequest(url, authHeader, 'POST', body, ChangeInfo)
+        })
+
+      const submitChange = (changeId: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/submit`
+          return yield* makeRequest(url, authHeader, 'POST', {}, SubmitInfo)
         })
 
       const testConnection = Effect.gen(function* () {
@@ -422,35 +483,23 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           lines.push(`+++ b/${filePath}`)
         }
 
-        let _oldLineNum = 1
-        let _newLineNum = 1
-
         for (const section of diff.content) {
           if (section.ab) {
             for (const line of section.ab) {
               lines.push(` ${line}`)
-              _oldLineNum++
-              _newLineNum++
             }
           }
 
           if (section.a) {
             for (const line of section.a) {
               lines.push(`-${line}`)
-              _oldLineNum++
             }
           }
 
           if (section.b) {
             for (const line of section.b) {
               lines.push(`+${line}`)
-              _newLineNum++
             }
-          }
-
-          if (section.skip) {
-            _oldLineNum += section.skip
-            _newLineNum += section.skip
           }
         }
 
@@ -515,8 +564,12 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       return {
         getChange,
         listChanges,
+        listProjects,
         postReview,
         abandonChange,
+        restoreChange,
+        rebaseChange,
+        submitChange,
         testConnection,
         getRevision,
         getFiles,

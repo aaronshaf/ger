@@ -7,6 +7,11 @@ import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { CommitHookServiceLive } from '@/services/commit-hook'
 import { abandonCommand } from './commands/abandon'
 import { addReviewerCommand } from './commands/add-reviewer'
+import { restoreCommand } from './commands/restore'
+import { rebaseCommand } from './commands/rebase'
+import { submitCommand } from './commands/submit'
+import { voteCommand } from './commands/vote'
+import { projectsCommand } from './commands/projects'
 import { buildStatusCommand, BUILD_STATUS_HELP_TEXT } from './commands/build-status'
 import { checkoutCommand, CHECKOUT_HELP_TEXT } from './commands/checkout'
 import { commentCommand } from './commands/comment'
@@ -24,6 +29,34 @@ import { showCommand, SHOW_HELP_TEXT } from './commands/show'
 import { statusCommand } from './commands/status'
 import { workspaceCommand } from './commands/workspace'
 import { sanitizeCDATA } from '@/utils/shell-safety'
+
+// Helper function to output error in plain text or XML format
+function outputError(error: unknown, options: { xml?: boolean }, resultTag: string): void {
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  if (options.xml) {
+    console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
+    console.log(`<${resultTag}>`)
+    console.log(`  <status>error</status>`)
+    console.log(`  <error><![CDATA[${errorMessage}]]></error>`)
+    console.log(`</${resultTag}>`)
+  } else {
+    console.error('✗ Error:', errorMessage)
+  }
+}
+
+// Helper function to execute Effect with standard error handling
+async function executeEffect<E>(
+  effect: Effect.Effect<void, E, never>,
+  options: { xml?: boolean },
+  resultTag: string,
+): Promise<void> {
+  try {
+    await Effect.runPromise(effect)
+  } catch (error) {
+    outputError(error, options, resultTag)
+    process.exit(1)
+  }
+}
 
 export function registerCommands(program: Command): void {
   // setup command (new primary command)
@@ -48,16 +81,14 @@ export function registerCommands(program: Command): void {
     .description('Check connection status')
     .option('--xml', 'XML output for LLM consumption')
     .action(async (options) => {
-      try {
-        const effect = statusCommand(options).pipe(
+      await executeEffect(
+        statusCommand(options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        console.error('Error:', error instanceof Error ? error.message : String(error))
-        process.exit(1)
-      }
+        ),
+        options,
+        'status_result',
+      )
     })
 
   // comment command
@@ -107,26 +138,14 @@ Note:
     look at the file after all changes have been applied.`,
     )
     .action(async (changeId, options) => {
-      try {
-        const effect = commentCommand(changeId, options).pipe(
+      await executeEffect(
+        commentCommand(changeId, options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<comment_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</comment_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'comment_result',
+      )
     })
 
   // diff command
@@ -138,26 +157,14 @@ Note:
     .option('--files-only', 'List changed files only')
     .option('--format <format>', 'Output format (unified, json, files)')
     .action(async (changeId, options) => {
-      try {
-        const effect = diffCommand(changeId, options).pipe(
+      await executeEffect(
+        diffCommand(changeId, options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<diff_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</diff_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'diff_result',
+      )
     })
 
   // mine command
@@ -166,26 +173,14 @@ Note:
     .description('Show your open changes')
     .option('--xml', 'XML output for LLM consumption')
     .action(async (options) => {
-      try {
-        const effect = mineCommand(options).pipe(
+      await executeEffect(
+        mineCommand(options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<mine_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</mine_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'mine_result',
+      )
     })
 
   // search command
@@ -224,26 +219,14 @@ Note:
     )
     .option('--xml', 'XML output for LLM consumption')
     .action(async (changeId, options) => {
-      try {
-        const effect = workspaceCommand(changeId, options).pipe(
+      await executeEffect(
+        workspaceCommand(changeId, options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<workspace_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</workspace_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'workspace_result',
+      )
     })
 
   // incoming command
@@ -253,26 +236,14 @@ Note:
     .option('--xml', 'XML output for LLM consumption')
     .option('-i, --interactive', 'Interactive mode with detailed view and diff')
     .action(async (options) => {
-      try {
-        const effect = incomingCommand(options).pipe(
+      await executeEffect(
+        incomingCommand(options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<incoming_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</incoming_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'incoming_result',
+      )
     })
 
   // abandon command
@@ -284,26 +255,84 @@ Note:
     .option('-m, --message <message>', 'Abandon message')
     .option('--xml', 'XML output for LLM consumption')
     .action(async (changeId, options) => {
-      try {
-        const effect = abandonCommand(changeId, options).pipe(
+      await executeEffect(
+        abandonCommand(changeId, options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<abandon_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</abandon_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'abandon_result',
+      )
+    })
+
+  // restore command
+  program
+    .command('restore <change-id>')
+    .description('Restore an abandoned change (accepts change number or Change-ID)')
+    .option('-m, --message <message>', 'Restoration message')
+    .option('--xml', 'XML output for LLM consumption')
+    .action(async (changeId, options) => {
+      await executeEffect(
+        restoreCommand(changeId, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'restore_result',
+      )
+    })
+
+  // rebase command
+  program
+    .command('rebase <change-id>')
+    .description('Rebase a change onto target branch (accepts change number or Change-ID)')
+    .option('--base <ref>', 'Base revision to rebase onto (default: target branch HEAD)')
+    .option('--xml', 'XML output for LLM consumption')
+    .action(async (changeId, options) => {
+      await executeEffect(
+        rebaseCommand(changeId, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'rebase_result',
+      )
+    })
+
+  // submit command
+  program
+    .command('submit <change-id>')
+    .description('Submit a change for merging (accepts change number or Change-ID)')
+    .option('--xml', 'XML output for LLM consumption')
+    .action(async (changeId, options) => {
+      await executeEffect(
+        submitCommand(changeId, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'submit_result',
+      )
+    })
+
+  // vote command
+  program
+    .command('vote <change-id>')
+    .description('Cast votes on a change (accepts change number or Change-ID)')
+    .option('--code-review <value>', 'Code-Review vote (-2 to +2)', parseInt)
+    .option('--verified <value>', 'Verified vote (-1 to +1)', parseInt)
+    .option('--label <name> <value>', 'Custom label vote (can be used multiple times)')
+    .option('-m, --message <message>', 'Comment with vote')
+    .option('--xml', 'XML output for LLM consumption')
+    .action(async (changeId, options) => {
+      await executeEffect(
+        voteCommand(changeId, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'vote_result',
+      )
     })
 
   // add-reviewer command
@@ -327,26 +356,31 @@ Examples:
   $ ger add-reviewer --notify none user@example.com -c 12345  # No email`,
     )
     .action(async (reviewers, options) => {
-      try {
-        const effect = addReviewerCommand(reviewers, options).pipe(
+      await executeEffect(
+        addReviewerCommand(reviewers, options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<add_reviewer_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</add_reviewer_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'add_reviewer_result',
+      )
+    })
+
+  // projects command
+  program
+    .command('projects')
+    .description('List Gerrit projects')
+    .option('--pattern <regex>', 'Filter projects by name pattern')
+    .option('--xml', 'XML output for LLM consumption')
+    .action(async (options) => {
+      await executeEffect(
+        projectsCommand(options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'projects_result',
+      )
     })
 
   // comments command
@@ -357,26 +391,14 @@ Examples:
     )
     .option('--xml', 'XML output for LLM consumption')
     .action(async (changeId, options) => {
-      try {
-        const effect = commentsCommand(changeId, options).pipe(
+      await executeEffect(
+        commentsCommand(changeId, options).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        if (options.xml) {
-          console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
-          console.log(`<comments_result>`)
-          console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
-          console.log(`</comments_result>`)
-        } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
-        }
-        process.exit(1)
-      }
+        ),
+        options,
+        'comments_result',
+      )
     })
 
   // open command

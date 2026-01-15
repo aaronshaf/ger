@@ -269,6 +269,20 @@ export const ReviewInput: Schema.Schema<{
 })
 export type ReviewInput = Schema.Schema.Type<typeof ReviewInput>
 
+// Project schema
+export const ProjectInfo: Schema.Schema<{
+  readonly id: string
+  readonly name: string
+  readonly parent?: string
+  readonly state?: 'ACTIVE' | 'READ_ONLY' | 'HIDDEN'
+}> = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  parent: Schema.optional(Schema.String),
+  state: Schema.optional(Schema.Literal('ACTIVE', 'READ_ONLY', 'HIDDEN')),
+})
+export type ProjectInfo = Schema.Schema.Type<typeof ProjectInfo>
+
 // File and diff schemas
 export const FileInfo: Schema.Schema<{
   readonly status?: 'A' | 'D' | 'R' | 'C' | 'M'
@@ -360,6 +374,17 @@ export const RevisionInfo: Schema.Schema<{
     readonly subject: string
     readonly message: string
   }
+  readonly files?: Record<
+    string,
+    {
+      readonly status?: 'A' | 'D' | 'R' | 'C' | 'M'
+      readonly lines_inserted?: number
+      readonly lines_deleted?: number
+      readonly size?: number
+      readonly size_delta?: number
+      readonly old_path?: string
+    }
+  >
 }> = Schema.Struct({
   kind: Schema.optional(Schema.String),
   _number: Schema.Number,
@@ -486,6 +511,24 @@ export const ReviewerResult: Schema.Schema<{
   confirm: Schema.optional(Schema.Boolean),
 })
 export type ReviewerResult = Schema.Schema.Type<typeof ReviewerResult>
+
+// Rebase schemas
+export const RebaseInput: Schema.Schema<{
+  readonly base?: string
+}> = Schema.Struct({
+  base: Schema.optional(Schema.String),
+})
+export type RebaseInput = Schema.Schema.Type<typeof RebaseInput>
+
+// Submit schemas
+export const SubmitInfo: Schema.Schema<{
+  readonly status: 'MERGED' | 'SUBMITTED'
+  readonly change_id?: string
+}> = Schema.Struct({
+  status: Schema.Literal('MERGED', 'SUBMITTED'),
+  change_id: Schema.optional(Schema.String),
+})
+export type SubmitInfo = Schema.Schema.Type<typeof SubmitInfo>
 
 // API Response schemas
 export const GerritError: Schema.Schema<{
