@@ -643,6 +643,55 @@ Requirements:
 - One of these AI tools must be installed: `claude`, `llm`, or `opencode`
 - Gerrit credentials must be configured (`ger setup`)
 
+## Claude Code Skill
+
+This repository includes a Claude Code Agent Skill that teaches Claude how to work effectively with Gerrit using the ger CLI. The skill provides Claude with expertise in Gerrit workflows, command usage, and best practices.
+
+### Installation
+
+Install the skill globally using Claude Code's plugin system:
+
+```bash
+# Add ger as a plugin marketplace
+/plugin marketplace add aaronshaf/ger
+
+# Install the gerrit-workflow skill
+/plugin install gerrit-workflow@ger
+```
+
+The skill will be available across all your projects, ready to assist with Gerrit operations whenever you need it.
+
+### What's Included
+
+The skill provides Claude with knowledge about:
+- Common Gerrit workflows (reviewing changes, posting comments)
+- All ger CLI commands and their options
+- Integration with Jenkins builds and AI tools
+- Best practices for code review
+- Real-world usage examples and scripting patterns
+
+### Using the Skill
+
+Once installed, simply ask Claude to help with Gerrit tasks:
+
+```
+"Review the incoming changes"
+"Show me the diff for change 12345"
+"Post a comment on this change"
+"Help me set up an AI review workflow"
+```
+
+Claude will automatically use the skill and guide you through Gerrit operations using ger commands.
+
+### Skill Contents
+
+```
+skills/gerrit-workflow/
+├── SKILL.md         # Main skill instructions
+├── reference.md     # Complete command reference
+└── examples.md      # Real-world usage examples
+```
+
 ## LLM Integration
 
 ```bash

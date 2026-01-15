@@ -1,0 +1,22 @@
+{
+  "name": "ger",
+  "version": "0.3.4",
+  "description": "Claude Code skill for working with Gerrit Code Review using the ger CLI tool. Provides expertise in Gerrit workflows, code review best practices, and ger command usage.",
+  "author": {
+    "name": "Aaron Shafovaloff",
+    "url": "https://github.com/aaronshaf"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aaronshaf/ger"
+  },
+  "homepage": "https://github.com/aaronshaf/ger#readme",
+  "license": "MIT",
+  "keywords": [
+    "gerrit",
+    "code-review",
+    "cli",
+    "workflow",
+    "ai-assistant"
+  ]
+}
