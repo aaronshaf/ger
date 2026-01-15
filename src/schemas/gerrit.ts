@@ -22,7 +22,7 @@ export const GerritCredentials: Schema.Schema<{
 export type GerritCredentials = Schema.Schema.Type<typeof GerritCredentials>
 
 // Forward declare RevisionInfo type for use in ChangeInfo
-interface RevisionInfoType {
+export interface RevisionInfoType {
   readonly kind?: string
   readonly _number: number
   readonly created: string

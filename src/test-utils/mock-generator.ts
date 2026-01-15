@@ -1,5 +1,5 @@
 import type { Schema } from '@effect/schema'
-import type { ChangeInfo, FileDiffContent, FileInfo } from '@/schemas/gerrit'
+import type { ChangeInfo, FileDiffContent, FileInfo, RevisionInfoType } from '@/schemas/gerrit'
 
 export const generateMockChange = (
   overrides?: Partial<Schema.Schema.Type<typeof ChangeInfo>>,
@@ -79,7 +79,7 @@ export const generateMockAccount = () => ({
 export const generateMockRevision = (
   patchsetNumber = 1,
   sha = '54795ce71b351480c887e92aa0e5b9a57aef58ab',
-) => ({
+): RevisionInfoType => ({
   kind: 'REWORK',
   _number: patchsetNumber,
   created: '2023-12-01 10:00:00.000000000',
@@ -102,7 +102,7 @@ export const generateMockRevision = (
         commit: 'parent-sha-1234567890abcdef',
         subject: 'Parent commit',
       },
-    ],
+    ] as const,
     author: {
       name: 'John Developer',
       email: 'john@example.com',
