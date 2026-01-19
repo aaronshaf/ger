@@ -46,7 +46,7 @@ function getVersion(): string {
 
 const program = new Command()
 
-program.name('gi').description('LLM-centric Gerrit CLI tool').version(getVersion())
+program.name('ger').description('LLM-centric Gerrit CLI tool').version(getVersion())
 
 registerCommands(program)
 
