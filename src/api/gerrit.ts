@@ -85,6 +85,11 @@ export interface GerritApiServiceImpl {
   readonly getGroup: (groupId: string) => Effect.Effect<GroupInfo, ApiError>
   readonly getGroupDetail: (groupId: string) => Effect.Effect<GroupDetailInfo, ApiError>
   readonly getGroupMembers: (groupId: string) => Effect.Effect<readonly AccountInfo[], ApiError>
+  readonly removeReviewer: (
+    changeId: string,
+    accountId: string,
+    options?: { notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL' },
+  ) => Effect.Effect<void, ApiError>
 }
 
 // Export both the tag value and the type for use in Effect requirements
@@ -648,6 +653,20 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           return yield* makeRequest(url, authHeader, 'GET', undefined, Schema.Array(AccountInfo))
         })
 
+      const removeReviewer = (
+        changeId: string,
+        accountId: string,
+        options?: { notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL' },
+      ) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          // Use POST to /delete endpoint to support request body with notify option
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/reviewers/${encodeURIComponent(accountId)}/delete`
+          const body = options?.notify ? { notify: options.notify } : {}
+          yield* makeRequest(url, authHeader, 'POST', body)
+        })
+
       return {
         getChange,
         listChanges,
@@ -671,6 +690,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         getGroup,
         getGroupDetail,
         getGroupMembers,
+        removeReviewer,
       }
     }),
   )

@@ -220,6 +220,24 @@ ger add-reviewer <change-id> user@example.com --cc
 | `--group <name>` | Add group as reviewer |
 | `--cc` | Add as CC instead of reviewer |
 
+### remove-reviewer
+
+Remove reviewers from a change.
+
+```bash
+ger remove-reviewer user@example.com -c 12345
+ger remove-reviewer user1@example.com user2@example.com -c 12345
+ger remove-reviewer johndoe -c 12345 --notify none
+```
+
+Supports email addresses, usernames, or account IDs as reviewer identifiers.
+
+| Option | Description |
+|--------|-------------|
+| `-c, --change <id>` | Change ID (required) |
+| `--notify <level>` | Notification level (none, owner, owner_reviewers, all) |
+| `--xml` | Output as XML |
+
 ## Git Operations
 
 ### checkout

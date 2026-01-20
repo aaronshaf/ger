@@ -6,7 +6,6 @@ import { ReviewStrategyServiceLive } from '@/services/review-strategy'
 import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { CommitHookServiceLive } from '@/services/commit-hook'
 import { abandonCommand } from './commands/abandon'
-import { addReviewerCommand } from './commands/add-reviewer'
 import { restoreCommand } from './commands/restore'
 import { rebaseCommand } from './commands/rebase'
 import { submitCommand } from './commands/submit'
@@ -30,6 +29,7 @@ import { statusCommand } from './commands/status'
 import { workspaceCommand } from './commands/workspace'
 import { sanitizeCDATA } from '@/utils/shell-safety'
 import { registerGroupCommands } from './register-group-commands'
+import { registerReviewerCommands } from './register-reviewer-commands'
 
 // Helper function to output error in plain text or XML format
 function outputError(error: unknown, options: { xml?: boolean }, resultTag: string): void {
@@ -336,39 +336,8 @@ Note:
       )
     })
 
-  // add-reviewer command
-  program
-    .command('add-reviewer <reviewers...>')
-    .description('Add reviewers or groups to a change')
-    .option('-c, --change <change-id>', 'Change ID (required until auto-detection is implemented)')
-    .option('--cc', 'Add as CC instead of reviewer')
-    .option('--group', 'Add as group instead of individual reviewer')
-    .option(
-      '--notify <level>',
-      'Notification level: none, owner, owner_reviewers, all (default: all)',
-    )
-    .option('--xml', 'XML output for LLM consumption')
-    .addHelpText(
-      'after',
-      `
-Examples:
-  $ ger add-reviewer user@example.com -c 12345          # Add a reviewer
-  $ ger add-reviewer user1@example.com user2@example.com -c 12345  # Multiple
-  $ ger add-reviewer --cc user@example.com -c 12345     # Add as CC
-  $ ger add-reviewer --group project-reviewers -c 12345 # Add a group
-  $ ger add-reviewer --group admins --cc -c 12345       # Add group as CC
-  $ ger add-reviewer --notify none user@example.com -c 12345  # No email`,
-    )
-    .action(async (reviewers, options) => {
-      await executeEffect(
-        addReviewerCommand(reviewers, options).pipe(
-          Effect.provide(GerritApiServiceLive),
-          Effect.provide(ConfigServiceLive),
-        ),
-        options,
-        'add_reviewer_result',
-      )
-    })
+  // Register all reviewer-related commands
+  registerReviewerCommands(program)
 
   // projects command
   program
