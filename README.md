@@ -421,6 +421,22 @@ ger diff 12345 --file src/main.ts
 
 ### Change Management
 
+#### Install Commit-Msg Hook
+```bash
+# Install the Gerrit commit-msg hook
+ger install-hook
+
+# Force reinstall (overwrite existing)
+ger install-hook --force
+```
+
+**What it does:**
+- Downloads the commit-msg hook from your configured Gerrit server
+- Installs to `.git/hooks/commit-msg` with executable permissions
+- Required for commits to have Change-Id footers
+
+**Note:** The `push` command auto-installs the hook if missing, but you can use this command to manually install or update it.
+
 #### Checkout Changes
 ```bash
 # Checkout latest patchset

@@ -370,6 +370,28 @@ ger init  # Alias
 
 **Creates:** `~/.ger/config.json` with secure permissions.
 
+### install-hook
+
+Install the Gerrit commit-msg hook for automatic Change-Id generation.
+
+```bash
+ger install-hook
+ger install-hook --force  # Overwrite existing hook
+```
+
+| Option | Description |
+|--------|-------------|
+| `--force` | Overwrite existing hook |
+| `--xml` | Output as XML |
+
+**Downloads:** Hook from configured Gerrit server.
+**Installs to:** `.git/hooks/commit-msg` (executable).
+
+**Use cases:**
+- Set up a new clone before first push
+- Repair corrupted hook
+- Update hook after Gerrit upgrade
+
 ### open
 
 Open change in browser.

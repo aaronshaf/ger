@@ -18,6 +18,7 @@ import { commentsCommand } from './commands/comments'
 import { diffCommand } from './commands/diff'
 import { extractUrlCommand } from './commands/extract-url'
 import { incomingCommand } from './commands/incoming'
+import { installHookCommand } from './commands/install-hook'
 import { mineCommand } from './commands/mine'
 import { openCommand } from './commands/open'
 import { pushCommand, PUSH_HELP_TEXT } from './commands/push'
@@ -526,6 +527,39 @@ Note:
         }
         process.exit(1)
       }
+    })
+
+  // install-hook command
+  program
+    .command('install-hook')
+    .description('Install the Gerrit commit-msg hook for automatic Change-Id generation')
+    .option('--force', 'Overwrite existing hook')
+    .option('--xml', 'XML output for LLM consumption')
+    .addHelpText(
+      'after',
+      `
+Examples:
+  # Install the commit-msg hook
+  $ ger install-hook
+
+  # Force reinstall (overwrite existing)
+  $ ger install-hook --force
+
+Note:
+  - Downloads hook from your configured Gerrit server
+  - Installs to .git/hooks/commit-msg
+  - Makes hook executable (chmod +x)
+  - Required for commits to have Change-Id footers`,
+    )
+    .action(async (options) => {
+      await executeEffect(
+        installHookCommand(options).pipe(
+          Effect.provide(CommitHookServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'install_hook_result',
+      )
     })
 
   // push command
