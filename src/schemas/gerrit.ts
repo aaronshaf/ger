@@ -118,6 +118,7 @@ export const ChangeInfo: Schema.Schema<{
   readonly work_in_progress?: boolean
   readonly current_revision?: string
   readonly revisions?: Record<string, RevisionInfoType>
+  readonly topic?: string
 }> = Schema.Struct({
   id: Schema.String,
   project: Schema.String,
@@ -182,6 +183,7 @@ export const ChangeInfo: Schema.Schema<{
   work_in_progress: Schema.optional(Schema.Boolean),
   current_revision: Schema.optional(Schema.String),
   revisions: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })),
+  topic: Schema.optional(Schema.String),
 })
 export type ChangeInfo = Schema.Schema.Type<typeof ChangeInfo>
 

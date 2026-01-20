@@ -48,6 +48,7 @@ interface ChangeDetails {
   created?: string
   updated?: string
   commitMessage: string
+  topic?: string
 }
 
 const getChangeDetails = (
@@ -71,6 +72,7 @@ const getChangeDetails = (
       created: change.created,
       updated: change.updated,
       commitMessage: change.subject, // For now, using subject as commit message
+      topic: change.topic,
     }
   })
 
@@ -142,6 +144,9 @@ const formatShowPretty = (
   console.log(`   Project: ${changeDetails.project}`)
   console.log(`   Branch: ${changeDetails.branch}`)
   console.log(`   Status: ${changeDetails.status}`)
+  if (changeDetails.topic) {
+    console.log(`   Topic: ${changeDetails.topic}`)
+  }
   console.log(`   Owner: ${changeDetails.owner.name || changeDetails.owner.email || 'Unknown'}`)
   console.log(
     `   Created: ${changeDetails.created ? formatDate(changeDetails.created) : 'Unknown'}`,
@@ -220,6 +225,7 @@ const formatShowJson = async (
       status: changeDetails.status,
       project: changeDetails.project,
       branch: changeDetails.branch,
+      topic: changeDetails.topic,
       owner: removeUndefined(changeDetails.owner),
       created: changeDetails.created,
       updated: changeDetails.updated,
@@ -301,6 +307,9 @@ const formatShowXml = async (
   xmlParts.push(`    <status>${escapeXML(changeDetails.status)}</status>`)
   xmlParts.push(`    <project>${escapeXML(changeDetails.project)}</project>`)
   xmlParts.push(`    <branch>${escapeXML(changeDetails.branch)}</branch>`)
+  if (changeDetails.topic) {
+    xmlParts.push(`    <topic><![CDATA[${sanitizeCDATA(changeDetails.topic)}]]></topic>`)
+  }
   xmlParts.push(`    <owner>`)
   if (changeDetails.owner.name) {
     xmlParts.push(`      <name><![CDATA[${sanitizeCDATA(changeDetails.owner.name)}]]></name>`)

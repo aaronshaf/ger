@@ -9,11 +9,12 @@ import { abandonCommand } from './commands/abandon'
 import { restoreCommand } from './commands/restore'
 import { rebaseCommand } from './commands/rebase'
 import { submitCommand } from './commands/submit'
+import { topicCommand, TOPIC_HELP_TEXT } from './commands/topic'
 import { voteCommand } from './commands/vote'
 import { projectsCommand } from './commands/projects'
 import { buildStatusCommand, BUILD_STATUS_HELP_TEXT } from './commands/build-status'
 import { checkoutCommand, CHECKOUT_HELP_TEXT } from './commands/checkout'
-import { commentCommand } from './commands/comment'
+import { commentCommand, COMMENT_HELP_TEXT } from './commands/comment'
 import { commentsCommand } from './commands/comments'
 import { diffCommand } from './commands/diff'
 import { extractUrlCommand } from './commands/extract-url'
@@ -107,38 +108,7 @@ export function registerCommands(program: Command): void {
     .option('--unresolved', 'Mark comment as unresolved (requires human attention)')
     .option('--batch', 'Read batch comments from stdin as JSON (see examples below)')
     .option('--xml', 'XML output for LLM consumption')
-    .addHelpText(
-      'after',
-      `
-Examples:
-  # Post a general comment on a change (using change number)
-  $ ger comment 12345 -m "Looks good to me!"
-
-  # Post a comment using Change-ID
-  $ ger comment If5a3ae8cb5a107e187447802358417f311d0c4b1 -m "LGTM"
-
-  # Post a comment using piped input (useful for multi-line comments or scripts)
-  $ echo "This is a comment from stdin!" | ger comment 12345
-  $ cat review-notes.txt | ger comment 12345
-
-  # Post a line-specific comment (line number from NEW file version)
-  $ ger comment 12345 --file src/main.js --line 42 -m "Consider using const here"
-
-  # Post an unresolved comment requiring human attention
-  $ ger comment 12345 --file src/api.js --line 15 -m "Security concern" --unresolved
-
-  # Post multiple comments using batch mode
-  $ echo '{"message": "Review complete", "comments": [
-      {"file": "src/main.js", "line": 10, "message": "Good refactor"},
-      {"file": "src/api.js", "line": 25, "message": "Check error handling", "unresolved": true}
-    ]}' | ger comment 12345 --batch
-
-Note:
-  - Both change number (e.g., 12345) and Change-ID (e.g., If5a3ae8...) formats are accepted
-  - Line numbers refer to the actual line numbers in the NEW version of the file,
-    NOT the line numbers shown in the diff view. To find the correct line number,
-    look at the file after all changes have been applied.`,
-    )
+    .addHelpText('after', COMMENT_HELP_TEXT)
     .action(async (changeId, options) => {
       await executeEffect(
         commentCommand(changeId, options).pipe(
@@ -314,6 +284,24 @@ Note:
         ),
         options,
         'submit_result',
+      )
+    })
+
+  // topic command
+  program
+    .command('topic [change-id] [topic]')
+    .description('Get, set, or remove topic for a change (auto-detects from HEAD if not specified)')
+    .option('--delete', 'Remove the topic from the change')
+    .option('--xml', 'XML output for LLM consumption')
+    .addHelpText('after', TOPIC_HELP_TEXT)
+    .action(async (changeId, topic, options) => {
+      await executeEffect(
+        topicCommand(changeId, topic, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'topic_result',
       )
     })
 

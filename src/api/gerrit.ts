@@ -90,26 +90,25 @@ export interface GerritApiServiceImpl {
     accountId: string,
     options?: { notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL' },
   ) => Effect.Effect<void, ApiError>
+  readonly getTopic: (changeId: string) => Effect.Effect<string | null, ApiError>
+  readonly setTopic: (changeId: string, topic: string) => Effect.Effect<string, ApiError>
+  readonly deleteTopic: (changeId: string) => Effect.Effect<void, ApiError>
 }
 
-// Export both the tag value and the type for use in Effect requirements
 export const GerritApiService: Context.Tag<GerritApiServiceImpl, GerritApiServiceImpl> =
   Context.GenericTag<GerritApiServiceImpl>('GerritApiService')
 export type GerritApiService = Context.Tag.Identifier<typeof GerritApiService>
 
-// Export ApiError fields interface explicitly
 export interface ApiErrorFields {
   readonly message: string
   readonly status?: number
 }
 
-// Define error schema (not exported, so type can be implicit)
 const ApiErrorSchema = Schema.TaggedError<ApiErrorFields>()('ApiError', {
   message: Schema.String,
   status: Schema.optional(Schema.Number),
 } as const) as unknown
 
-// Export the error class with explicit constructor signature for isolatedDeclarations
 export class ApiError
   extends (ApiErrorSchema as new (
     args: ApiErrorFields,
@@ -127,7 +126,7 @@ const createAuthHeader = (credentials: GerritCredentials): string => {
 const makeRequest = <T = unknown>(
   url: string,
   authHeader: string,
-  method: 'GET' | 'POST' = 'GET',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
   body?: unknown,
   schema?: Schema.Schema<T>,
 ): Effect.Effect<T, ApiError> =>
@@ -155,12 +154,7 @@ const makeRequest = <T = unknown>(
         try: () => response.text(),
         catch: () => 'Unknown error',
       }).pipe(Effect.orElseSucceed(() => 'Unknown error'))
-      yield* Effect.fail(
-        new ApiError({
-          message: errorText,
-          status: response.status,
-        }),
-      )
+      yield* Effect.fail(new ApiError({ message: errorText, status: response.status }))
     }
 
     const text = yield* Effect.tryPromise({
@@ -168,13 +162,8 @@ const makeRequest = <T = unknown>(
       catch: () => new ApiError({ message: 'Failed to read response data' }),
     })
 
-    // Gerrit returns JSON with )]}' prefix for security
     const cleanJson = text.replace(/^\)\]\}'\n?/, '')
-
-    if (!cleanJson.trim()) {
-      // Empty response - return empty object for endpoints that expect void
-      return {} as T
-    }
+    if (!cleanJson.trim()) return {} as T
 
     const parsed = yield* Effect.try({
       try: () => JSON.parse(cleanJson),
@@ -186,8 +175,6 @@ const makeRequest = <T = unknown>(
         Effect.mapError(() => new ApiError({ message: 'Invalid response format from server' })),
       )
     }
-
-    // When no schema is provided, the caller expects void or doesn't care about the response
     return parsed
   })
 
@@ -201,16 +188,13 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         const credentials = yield* configService.getCredentials.pipe(
           Effect.mapError(() => new ApiError({ message: 'Failed to get credentials' })),
         )
-        // Ensure host doesn't have trailing slash
-        const normalizedCredentials = {
-          ...credentials,
-          host: credentials.host.replace(/\/$/, ''),
+        const normalizedCredentials = { ...credentials, host: credentials.host.replace(/\/$/, '') }
+        return {
+          credentials: normalizedCredentials,
+          authHeader: createAuthHeader(normalizedCredentials),
         }
-        const authHeader = createAuthHeader(normalizedCredentials)
-        return { credentials: normalizedCredentials, authHeader }
       })
 
-      // Helper to normalize and validate change identifier
       const normalizeAndValidate = (changeId: string): Effect.Effect<string, ApiError> =>
         Effect.try({
           try: () => normalizeChangeIdentifier(changeId),
@@ -231,9 +215,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const listChanges = (query = 'is:open') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const encodedQuery = encodeURIComponent(query)
-          // Add additional options to get detailed information
-          const url = `${credentials.host}/a/changes/?q=${encodedQuery}&o=LABELS&o=DETAILED_LABELS&o=DETAILED_ACCOUNTS&o=SUBMITTABLE`
+          const url = `${credentials.host}/a/changes/?q=${encodeURIComponent(query)}&o=LABELS&o=DETAILED_LABELS&o=DETAILED_ACCOUNTS&o=SUBMITTABLE`
           return yield* makeRequest(url, authHeader, 'GET', undefined, Schema.Array(ChangeInfo))
         })
 
@@ -241,10 +223,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
           let url = `${credentials.host}/a/projects/`
-          if (options?.pattern) {
-            url += `?p=${encodeURIComponent(options.pattern)}`
-          }
-          // Gerrit returns projects as a Record, need to convert to array
+          if (options?.pattern) url += `?p=${encodeURIComponent(options.pattern)}`
           const projectsRecord = yield* makeRequest(
             url,
             authHeader,
@@ -252,7 +231,6 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
             undefined,
             Schema.Record({ key: Schema.String, value: ProjectInfo }),
           )
-          // Convert Record to Array and sort alphabetically by name
           return Object.values(projectsRecord).sort((a, b) => a.name.localeCompare(b.name))
         })
 
@@ -306,7 +284,6 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         return true
       }).pipe(
         Effect.catchAll((error) => {
-          // Log the actual error for debugging
           if (process.env.DEBUG) {
             console.error('Connection error:', error)
           }
@@ -373,15 +350,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
               try: () => response.text(),
               catch: () => 'Unknown error',
             }).pipe(Effect.orElseSucceed(() => 'Unknown error'))
-
-            yield* Effect.fail(
-              new ApiError({
-                message: errorText,
-                status: response.status,
-              }),
-            )
+            yield* Effect.fail(new ApiError({ message: errorText, status: response.status }))
           }
-
           const base64Content = yield* Effect.tryPromise({
             try: () => response.text(),
             catch: () => new ApiError({ message: 'Failed to read response data' }),
@@ -414,15 +384,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
               try: () => response.text(),
               catch: () => 'Unknown error',
             }).pipe(Effect.orElseSucceed(() => 'Unknown error'))
-
-            yield* Effect.fail(
-              new ApiError({
-                message: errorText,
-                status: response.status,
-              }),
-            )
+            yield* Effect.fail(new ApiError({ message: errorText, status: response.status }))
           }
-
           const base64Patch = yield* Effect.tryPromise({
             try: () => response.text(),
             catch: () => new ApiError({ message: 'Failed to read response data' }),
@@ -546,7 +509,6 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}?o=MESSAGES`
           const response = yield* makeRequest(url, authHeader, 'GET')
 
-          // Extract messages from the change response with runtime validation
           const changeResponse = yield* Schema.decodeUnknown(
             Schema.Struct({
               messages: Schema.optional(Schema.Array(MessageInfo)),
@@ -616,7 +578,6 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
             url += `?${params.join('&')}`
           }
 
-          // Gerrit returns groups as a Record, need to convert to array
           const groupsRecord = yield* makeRequest(
             url,
             authHeader,
@@ -624,12 +585,9 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
             undefined,
             Schema.Record({ key: Schema.String, value: GroupInfo }),
           )
-          // Convert Record to Array and sort alphabetically by name
-          return Object.values(groupsRecord).sort((a, b) => {
-            const aName = a.name || a.id
-            const bName = b.name || b.id
-            return aName.localeCompare(bName)
-          })
+          return Object.values(groupsRecord).sort((a, b) =>
+            (a.name || a.id).localeCompare(b.name || b.id),
+          )
         })
 
       const getGroup = (groupId: string) =>
@@ -661,10 +619,52 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
           const normalized = yield* normalizeAndValidate(changeId)
-          // Use POST to /delete endpoint to support request body with notify option
           const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/reviewers/${encodeURIComponent(accountId)}/delete`
           const body = options?.notify ? { notify: options.notify } : {}
           yield* makeRequest(url, authHeader, 'POST', body)
+        })
+
+      const getTopicUrl = (host: string, changeId: string): string =>
+        `${host}/a/changes/${encodeURIComponent(changeId)}/topic`
+
+      const getTopic = (changeId: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          return yield* makeRequest(
+            getTopicUrl(credentials.host, normalized),
+            authHeader,
+            'GET',
+            undefined,
+            Schema.String,
+          ).pipe(
+            Effect.map((t) => t.replace(/^"|"$/g, '') || null),
+            Effect.catchIf(
+              (e) => e instanceof ApiError && e.status === 404,
+              () => Effect.succeed(null),
+            ),
+          )
+        })
+
+      const setTopic = (changeId: string, topic: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const result = yield* makeRequest(
+            getTopicUrl(credentials.host, normalized),
+            authHeader,
+            'PUT',
+            { topic },
+            Schema.String,
+          )
+          return result.replace(/^"|"$/g, '')
+        })
+
+      const deleteTopic = (changeId: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          yield* makeRequest(getTopicUrl(credentials.host, normalized), authHeader, 'DELETE')
         })
 
       return {
@@ -691,6 +691,9 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         getGroupDetail,
         getGroupMembers,
         removeReviewer,
+        getTopic,
+        setTopic,
+        deleteTopic,
       }
     }),
   )

@@ -129,6 +129,55 @@ ger workspace
 
 **Output:** Current branch and associated Gerrit change.
 
+### topic
+
+Get, set, or remove topic for a change.
+
+```bash
+ger topic [change-id]              # View current topic (auto-detect from HEAD)
+ger topic [change-id] <topic>      # Set topic
+ger topic [change-id] --delete     # Remove topic
+ger topic [change-id] --xml        # XML output
+```
+
+| Option | Description |
+|--------|-------------|
+| `--delete` | Remove the topic from the change |
+| `--xml` | Output as XML for LLM consumption |
+
+**Output formats:**
+
+Text (get):
+```
+my-feature
+```
+
+Text (set):
+```
+✓ Set topic on change 12345: my-feature
+```
+
+Text (delete):
+```
+✓ Removed topic from change 12345
+```
+
+XML:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<topic_result>
+  <status>success</status>
+  <action>get|set|deleted</action>
+  <change_id><![CDATA[12345]]></change_id>
+  <topic><![CDATA[my-feature]]></topic>
+</topic_result>
+```
+
+**Use cases:**
+- Group related changes under a common topic
+- Filter changes by topic in Gerrit UI
+- Organize work for releases or features
+
 ## Code Review
 
 ### comment

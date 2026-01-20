@@ -3,6 +3,24 @@ import { Effect, pipe } from 'effect'
 import { type ApiError, GerritApiService } from '@/api/gerrit'
 import type { ChangeInfo, ReviewInput } from '@/schemas/gerrit'
 
+export const COMMENT_HELP_TEXT = `
+Examples:
+  # Post a general comment on a change
+  $ ger comment 12345 -m "Looks good to me!"
+
+  # Post a comment using piped input
+  $ echo "This is a comment from stdin!" | ger comment 12345
+
+  # Post a line-specific comment
+  $ ger comment 12345 --file src/main.js --line 42 -m "Consider using const here"
+
+  # Post multiple comments using batch mode
+  $ echo '{"message": "Review complete", "comments": [
+      {"file": "src/main.js", "line": 10, "message": "Good refactor"}
+    ]}' | ger comment 12345 --batch
+
+Note: Line numbers refer to the NEW version of the file, not diff line numbers.`
+
 interface CommentOptions {
   message?: string
   xml?: boolean
