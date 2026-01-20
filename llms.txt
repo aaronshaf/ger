@@ -1,0 +1,217 @@
+# ger
+
+> CLI for Gerrit code review. Query changes, post comments, vote, manage reviewers, checkout/push code, check build status. Supports XML output for LLM pipelines.
+
+## Installation
+
+```bash
+bun install -g @aaronshaf/ger
+ger setup  # Configure credentials interactively
+```
+
+## Change Identifiers
+
+Commands accept change number (12345) or Change-ID (If5a3ae8...). Many commands auto-detect from HEAD commit when omitted.
+
+## Commands
+
+### View Changes
+
+```bash
+ger show [change-id]              # Full change info: metadata, diff, comments
+ger show --xml                    # XML output for LLM consumption
+ger diff <change-id>              # Get diff
+ger diff <change-id> --files-only # List changed files only
+ger comments <change-id>          # View all comments with context
+ger search "owner:self status:open"  # Gerrit query syntax
+ger search "project:foo" -n 10    # Limit results
+```
+
+### List Changes
+
+```bash
+ger mine                  # Your open changes
+ger incoming              # Changes awaiting your review
+```
+
+### Post Comments
+
+```bash
+ger comment <change-id> -m "LGTM"                           # Overall comment
+echo "Review text" | ger comment <change-id>                # Piped input
+ger comment <change-id> --file src/foo.ts --line 42 -m "Fix this"  # Line comment
+ger comment <change-id> --file src/foo.ts --line 42 -m "Bug" --unresolved
+```
+
+Batch comments via JSON stdin:
+
+```bash
+echo '[
+  {"file": "src/main.ts", "line": 10, "message": "Add type annotation"},
+  {"file": "src/api.ts", "line": 25, "message": "Handle error", "unresolved": true}
+]' | ger comment <change-id> --batch
+```
+
+JSON schema: `{"file": string, "line": number, "message": string, "unresolved"?: boolean, "side"?: "PARENT"|"REVISION", "range"?: {start_line, end_line, start_character?, end_character?}}`
+
+### Vote
+
+```bash
+ger vote <change-id> --code-review +2
+ger vote <change-id> --code-review +2 --verified +1 -m "LGTM"
+ger vote <change-id> --label "Custom-Label" +1
+```
+
+### Manage Reviewers
+
+```bash
+ger add-reviewer user@example.com -c <change-id>
+ger add-reviewer user1 user2 -c <change-id>
+ger add-reviewer --group team-name -c <change-id>
+ger add-reviewer --cc user@example.com -c <change-id>
+ger remove-reviewer user@example.com -c <change-id>
+```
+
+### Topic Management
+
+```bash
+ger topic <change-id>              # View current topic
+ger topic <change-id> my-feature   # Set topic
+ger topic <change-id> --delete     # Remove topic
+```
+
+### Git Operations
+
+```bash
+ger checkout <change-id>           # Fetch and checkout change
+ger checkout <change-id> --detach  # Detached HEAD
+ger push                           # Push for review
+ger push -r alice@example.com -t my-topic --wip
+ger push --dry-run                 # Preview push
+```
+
+### Change Lifecycle
+
+```bash
+ger rebase [change-id]             # Rebase onto target branch
+ger submit <change-id>             # Submit for merge
+ger abandon <change-id> -m "reason"
+ger restore <change-id>
+```
+
+### Build Status
+
+```bash
+ger build-status [change-id]                    # Check status: pending|running|success|failure
+ger build-status --watch                        # Poll until completion
+ger build-status --watch --exit-status && deploy.sh  # Exit 1 on failure
+```
+
+### Extract URLs
+
+```bash
+ger extract-url "build-summary-report" | tail -1   # Latest Jenkins URL
+ger extract-url "jenkins" --json | jq -r '.urls[-1]'
+```
+
+### AI Review
+
+```bash
+ger review <change-id>              # AI-powered review (requires claude/gemini/opencode CLI)
+ger review <change-id> --tool claude
+ger review <change-id> --comment --yes  # Post review comments
+```
+
+### Groups
+
+```bash
+ger groups                         # List groups
+ger groups --pattern "^team-.*"    # Filter by regex
+ger groups-show <group-id>         # Group details
+ger groups-members <group-id>      # List members
+```
+
+### Utilities
+
+```bash
+ger status                         # Check connection
+ger open <change-id>               # Open in browser
+ger install-hook                   # Install commit-msg hook
+ger projects                       # List projects
+```
+
+## Output Formats
+
+Most commands support `--xml` for structured LLM output:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<comment_result>
+  <status>success</status>
+  <change_id>12345</change_id>
+</comment_result>
+```
+
+Some commands also support `--json`.
+
+## Gerrit Query Syntax
+
+Common operators for `ger search`:
+
+- `owner:USER` - Changes owned by user (use 'self' for yourself)
+- `status:STATE` - open, merged, abandoned
+- `project:NAME` - Filter by project
+- `branch:NAME` - Filter by branch
+- `reviewer:USER` - Changes where user is reviewer
+- `is:wip` - Work-in-progress
+- `is:submittable` - Ready to submit
+- `age:TIME` - Time since update (1d, 2w, 1mon)
+- `label:Code-Review+2` - Filter by vote
+
+## Common Workflows
+
+### Review a change
+
+```bash
+ger show 12345                     # View change
+ger diff 12345                     # See code changes
+ger comment 12345 -m "LGTM"        # Add comment
+ger vote 12345 --code-review +2    # Approve
+```
+
+### Post AI review
+
+```bash
+ger review 12345 --comment --yes
+```
+
+### Check build and get failures
+
+```bash
+ger build-status --watch --exit-status
+ger extract-url "build-summary-report" | tail -1  # Get Jenkins URL
+```
+
+### Push with reviewers
+
+```bash
+ger push -r alice@example.com -r bob@example.com -t feature-topic
+```
+
+## Exit Codes
+
+- `0` - Success
+- `1` - Error (or build failure with --exit-status)
+- `2` - Timeout
+- `3` - API/network error
+
+## Configuration
+
+Credentials stored in `~/.ger/config.json`. Run `ger setup` to configure:
+- Gerrit host URL
+- Username
+- HTTP password (from Gerrit settings)
+
+## Links
+
+- [Gerrit Query Syntax](https://gerrit-review.googlesource.com/Documentation/user-search.html)
