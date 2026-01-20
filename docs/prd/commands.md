@@ -283,9 +283,17 @@ ger push --wip
 Rebase a change on target branch.
 
 ```bash
-ger rebase <change-id>
-ger rebase <change-id> --base <ref>
+ger rebase [change-id]
+ger rebase 12345
+ger rebase If5a3ae8...  # Change-ID format
+ger rebase              # Auto-detect from HEAD
+ger rebase --base <ref> # Rebase onto specific ref
 ```
+
+| Option | Description |
+|--------|-------------|
+| `--base <ref>` | Base revision to rebase onto |
+| `--xml` | Output as XML for LLM consumption |
 
 ### submit
 

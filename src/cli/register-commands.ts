@@ -285,8 +285,8 @@ Note:
 
   // rebase command
   program
-    .command('rebase <change-id>')
-    .description('Rebase a change onto target branch (accepts change number or Change-ID)')
+    .command('rebase [change-id]')
+    .description('Rebase a change onto target branch (auto-detects from HEAD if not provided)')
     .option('--base <ref>', 'Base revision to rebase onto (default: target branch HEAD)')
     .option('--xml', 'XML output for LLM consumption')
     .action(async (changeId, options) => {
