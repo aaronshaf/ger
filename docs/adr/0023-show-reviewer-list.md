@@ -17,7 +17,7 @@ This created a workflow gap:
 
 Add reviewer visibility to `ger show` by:
 
-1. Expanding `getChange` API query options to request detailed account/label context.
+1. Keeping `getChange` lightweight and using a `listChanges` fallback (with detailed account/label options) when reviewer state is not present in the base change response.
 2. Extending `ChangeInfo` schema with Gerrit reviewer state maps (`REVIEWER`, `CC`, `REMOVED`).
 3. Rendering reviewers and CCs in all `show` output formats (pretty, JSON, XML).
 
@@ -38,5 +38,5 @@ Add reviewer visibility to `ger show` by:
 
 ### Negative
 
-- Slightly larger `getChange` payload size due to additional query options.
+- Extra `listChanges` request when reviewer data is absent from `getChange`.
 - Additional schema/output maintenance for reviewer state rendering.

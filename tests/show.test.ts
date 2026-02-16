@@ -689,10 +689,52 @@ describe('show command', () => {
 
     await Effect.runPromise(program)
 
-    expect(listChangesQuery).toBe('change:I123abc456def')
+    expect(listChangesQuery).toBe('change:12345')
     expect(listChangesOptions).toContain('LABELS')
     expect(listChangesOptions).toContain('DETAILED_LABELS')
     expect(listChangesOptions).toContain('DETAILED_ACCOUNTS')
+  })
+
+  test('should not fetch listChanges when reviewer data is explicitly present but empty', async () => {
+    let listChangesCalled = false
+
+    const changeWithEmptyReviewerLists = {
+      ...mockChange,
+      reviewers: {
+        REVIEWER: [],
+        CC: [],
+      },
+    }
+
+    server.use(
+      http.get('*/a/changes/:changeId', ({ request }) => {
+        const url = new URL(request.url)
+        if (url.searchParams.get('o') === 'MESSAGES') {
+          return HttpResponse.text(`)]}'\n${JSON.stringify({ messages: [] })}`)
+        }
+        return HttpResponse.text(`)]}'\n${JSON.stringify(changeWithEmptyReviewerLists)}`)
+      }),
+      http.get('*/a/changes/', () => {
+        listChangesCalled = true
+        return HttpResponse.text(`)]}'\n[]`)
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/patch', () => {
+        return HttpResponse.text(btoa(mockDiff))
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/comments', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockComments)}`)
+      }),
+    )
+
+    const mockConfigLayer = createMockConfigLayer()
+    const program = showCommand('12345', {}).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    expect(listChangesCalled).toBe(false)
   })
 
   test('should handle large JSON output without truncation', async () => {

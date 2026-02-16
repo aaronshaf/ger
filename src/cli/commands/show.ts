@@ -83,15 +83,16 @@ const getChangeDetails = (
     const change = yield* gerritApi.getChange(changeId)
 
     let reviewerMap = change.reviewers
-    const hasReviewerData =
-      (reviewerMap?.REVIEWER?.length ?? 0) > 0 || (reviewerMap?.CC?.length ?? 0) > 0
+    const shouldFetchReviewerFallback =
+      reviewerMap === undefined ||
+      (reviewerMap.REVIEWER === undefined && reviewerMap.CC === undefined)
 
-    if (!hasReviewerData) {
+    if (shouldFetchReviewerFallback) {
       const detailedChanges = yield* gerritApi
-        .listChanges(`change:${change.change_id}`)
+        .listChanges(`change:${change._number}`)
         .pipe(Effect.catchAll(() => Effect.succeed([])))
       const detailedChange =
-        detailedChanges.find((candidate) => candidate.change_id === change.change_id) ||
+        detailedChanges.find((candidate) => candidate._number === change._number) ||
         detailedChanges[0]
       reviewerMap = detailedChange?.reviewers
     }
