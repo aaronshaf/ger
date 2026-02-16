@@ -28,3 +28,4 @@ Records of significant architectural decisions with context and rationale. Each 
 | [0020](0020-code-coverage-enforcement.md) | 80% coverage threshold in pre-commit |
 | [0021](0021-typescript-isolated-declarations.md) | Explicit return types on exports |
 | [0022](0022-biome-oxlint-tooling.md) | Biome formatter + oxlint linter |
+| [0023](0023-show-reviewer-list.md) | Surface reviewers and CCs in `ger show` |

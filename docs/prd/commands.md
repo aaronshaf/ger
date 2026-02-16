@@ -23,10 +23,12 @@ ger show              # Auto-detect from HEAD
 
 **Output includes:**
 - Change metadata (number, project, branch, status)
-- Owner and reviewer information
+- Owner, reviewers, and CC information
 - Submit requirements
 - Full diff
 - All comments with context
+
+Reviewer listing for a specific change is provided by `show` (there is no separate `list-reviewers` command).
 
 ### diff
 

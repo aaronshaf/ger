@@ -95,6 +95,27 @@ describe('show command', () => {
       name: 'John Doe',
       email: 'john@example.com',
     },
+    reviewers: {
+      REVIEWER: [
+        {
+          _account_id: 2001,
+          name: 'Jane Reviewer',
+          email: 'jane.reviewer@example.com',
+          username: 'jreviewer',
+        },
+        {
+          email: 'second.reviewer@example.com',
+          username: 'sreviewer',
+        },
+      ],
+      CC: [
+        {
+          _account_id: 2003,
+          name: 'Team Observer',
+          email: 'observer@example.com',
+        },
+      ],
+    },
   })
 
   const mockDiff = `--- a/src/auth.js
@@ -194,6 +215,9 @@ describe('show command', () => {
     expect(output).toContain('Branch: main')
     expect(output).toContain('Status: NEW')
     expect(output).toContain('Owner: John Doe')
+    expect(output).toContain('Reviewers: Jane Reviewer <jane.reviewer@example.com>')
+    expect(output).toContain('second.reviewer@example.com')
+    expect(output).toContain('CCs: Team Observer <observer@example.com>')
     expect(output).toContain('Change-Id: I123abc456def')
     expect(output).toContain('🔍 Diff:')
     expect(output).toContain('💬 Inline Comments:')
@@ -234,6 +258,13 @@ describe('show command', () => {
     expect(output).toContain('<owner>')
     expect(output).toContain('<name><![CDATA[John Doe]]></name>')
     expect(output).toContain('<email>john@example.com</email>')
+    expect(output).toContain('<reviewers>')
+    expect(output).toContain('<count>2</count>')
+    expect(output).toContain('<name><![CDATA[Jane Reviewer]]></name>')
+    expect(output).toContain('<ccs>')
+    expect(output).toContain('<count>1</count>')
+    expect(output).toContain('<name><![CDATA[Team Observer]]></name>')
+    expect(output).not.toContain('<account_id>undefined</account_id>')
     expect(output).toContain('<diff><![CDATA[')
     expect(output).toContain('<comments>')
     expect(output).toContain('<count>3</count>')
@@ -482,6 +513,14 @@ describe('show command', () => {
     expect(parsed.change.branch).toBe('main')
     expect(parsed.change.owner.name).toBe('John Doe')
     expect(parsed.change.owner.email).toBe('john@example.com')
+    expect(Array.isArray(parsed.change.reviewers)).toBe(true)
+    expect(parsed.change.reviewers.length).toBe(2)
+    expect(parsed.change.reviewers[0].name).toBe('Jane Reviewer')
+    expect(parsed.change.reviewers[1].email).toBe('second.reviewer@example.com')
+    expect(parsed.change.reviewers[1].account_id).toBeUndefined()
+    expect(Array.isArray(parsed.change.ccs)).toBe(true)
+    expect(parsed.change.ccs.length).toBe(1)
+    expect(parsed.change.ccs[0].name).toBe('Team Observer')
 
     // Check diff is present
     expect(parsed.diff).toContain('src/auth.js')
@@ -609,6 +648,51 @@ describe('show command', () => {
     expect(parsed.messages[0].message).toContain('https://jenkins.example.com')
     expect(parsed.messages[0].author.name).toBe('Jenkins Bot')
     expect(parsed.messages[0].revision).toBe(2)
+  })
+
+  test('should fetch reviewers from listChanges when getChange lacks reviewer data', async () => {
+    let listChangesOptions: string[] = []
+    let listChangesQuery = ''
+
+    const changeWithoutReviewers = {
+      ...mockChange,
+      reviewers: undefined,
+    }
+
+    server.use(
+      http.get('*/a/changes/:changeId', ({ request }) => {
+        const url = new URL(request.url)
+        if (url.searchParams.get('o') === 'MESSAGES') {
+          return HttpResponse.text(`)]}'\n${JSON.stringify({ messages: [] })}`)
+        }
+        return HttpResponse.text(`)]}'\n${JSON.stringify(changeWithoutReviewers)}`)
+      }),
+      http.get('*/a/changes/', ({ request }) => {
+        const url = new URL(request.url)
+        listChangesOptions = url.searchParams.getAll('o')
+        listChangesQuery = url.searchParams.get('q') || ''
+        return HttpResponse.text(`)]}'\n${JSON.stringify([mockChange])}`)
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/patch', () => {
+        return HttpResponse.text(btoa(mockDiff))
+      }),
+      http.get('*/a/changes/:changeId/revisions/current/comments', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockComments)}`)
+      }),
+    )
+
+    const mockConfigLayer = createMockConfigLayer()
+    const program = showCommand('12345', {}).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    expect(listChangesQuery).toBe('change:I123abc456def')
+    expect(listChangesOptions).toContain('LABELS')
+    expect(listChangesOptions).toContain('DETAILED_LABELS')
+    expect(listChangesOptions).toContain('DETAILED_ACCOUNTS')
   })
 
   test('should handle large JSON output without truncation', async () => {

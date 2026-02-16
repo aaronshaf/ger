@@ -132,6 +132,34 @@ describe('submit command', () => {
     expect(output).toContain('Status: MERGED')
   })
 
+  it('should fetch change without detailed reviewer options', async () => {
+    let requestedOptions: string[] = []
+
+    server.use(
+      http.get('*/a/changes/12345', ({ request }) => {
+        const url = new URL(request.url)
+        requestedOptions = url.searchParams.getAll('o')
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockSubmittableChange)}`)
+      }),
+      http.post('*/a/changes/12345/submit', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockSubmitResponse)}`)
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    const program = submitCommand('12345', {}).pipe(
+      Effect.provide(GerritApiServiceLive),
+      Effect.provide(mockConfigLayer),
+    )
+
+    await Effect.runPromise(program)
+
+    expect(requestedOptions).toContain('CURRENT_REVISION')
+    expect(requestedOptions).toContain('CURRENT_COMMIT')
+    expect(requestedOptions).not.toContain('DETAILED_LABELS')
+    expect(requestedOptions).not.toContain('DETAILED_ACCOUNTS')
+  })
+
   it('should output XML format when --xml flag is used', async () => {
     server.use(
       http.get('*/a/changes/12345', () => {

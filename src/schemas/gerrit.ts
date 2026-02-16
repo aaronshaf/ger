@@ -1,6 +1,5 @@
 import { Schema } from '@effect/schema'
 
-// Authentication schemas
 export const GerritCredentials: Schema.Schema<{
   readonly host: string
   readonly username: string
@@ -21,7 +20,6 @@ export const GerritCredentials: Schema.Schema<{
 })
 export type GerritCredentials = Schema.Schema.Type<typeof GerritCredentials>
 
-// Forward declare RevisionInfo type for use in ChangeInfo
 export interface RevisionInfoType {
   readonly kind?: string
   readonly _number: number
@@ -65,7 +63,22 @@ export interface RevisionInfoType {
   >
 }
 
-// Change schemas
+type ChangeReviewerAccount = {
+  readonly _account_id?: number
+  readonly name?: string
+  readonly email?: string
+  readonly username?: string
+}
+const ChangeReviewerAccountInfo: Schema.Schema<ChangeReviewerAccount> = Schema.Struct({
+  _account_id: Schema.optional(Schema.Number),
+  name: Schema.optional(Schema.String),
+  email: Schema.optional(Schema.String),
+  username: Schema.optional(Schema.String),
+})
+type ChangeReviewerMap = Partial<
+  Record<'REVIEWER' | 'CC' | 'REMOVED', ReadonlyArray<ChangeReviewerAccount>>
+>
+
 export const ChangeInfo: Schema.Schema<{
   readonly id: string
   readonly project: string
@@ -119,6 +132,7 @@ export const ChangeInfo: Schema.Schema<{
   readonly current_revision?: string
   readonly revisions?: Record<string, RevisionInfoType>
   readonly topic?: string
+  readonly reviewers?: ChangeReviewerMap
 }> = Schema.Struct({
   id: Schema.String,
   project: Schema.String,
@@ -184,10 +198,16 @@ export const ChangeInfo: Schema.Schema<{
   current_revision: Schema.optional(Schema.String),
   revisions: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })),
   topic: Schema.optional(Schema.String),
+  reviewers: Schema.optional(
+    Schema.Struct({
+      REVIEWER: Schema.optional(Schema.Array(ChangeReviewerAccountInfo)),
+      CC: Schema.optional(Schema.Array(ChangeReviewerAccountInfo)),
+      REMOVED: Schema.optional(Schema.Array(ChangeReviewerAccountInfo)),
+    }),
+  ),
 })
 export type ChangeInfo = Schema.Schema.Type<typeof ChangeInfo>
 
-// Comment schemas
 export const CommentInput: Schema.Schema<{
   readonly message: string
   readonly unresolved?: boolean
@@ -200,7 +220,6 @@ export const CommentInput: Schema.Schema<{
 })
 export type CommentInput = Schema.Schema.Type<typeof CommentInput>
 
-// Comment info returned from API
 export const CommentInfo: Schema.Schema<{
   readonly id: string
   readonly path?: string
@@ -246,7 +265,6 @@ export const CommentInfo: Schema.Schema<{
 })
 export type CommentInfo = Schema.Schema.Type<typeof CommentInfo>
 
-// Message info for review messages
 export const MessageInfo: Schema.Schema<{
   readonly id: string
   readonly message: string
@@ -319,7 +337,6 @@ export const ReviewInput: Schema.Schema<{
 })
 export type ReviewInput = Schema.Schema.Type<typeof ReviewInput>
 
-// Project schema
 export const ProjectInfo: Schema.Schema<{
   readonly id: string
   readonly name: string
@@ -333,7 +350,6 @@ export const ProjectInfo: Schema.Schema<{
 })
 export type ProjectInfo = Schema.Schema.Type<typeof ProjectInfo>
 
-// File and diff schemas
 export const FileInfo: Schema.Schema<{
   readonly status?: 'A' | 'D' | 'R' | 'C' | 'M'
   readonly lines_inserted?: number

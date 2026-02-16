@@ -7,7 +7,6 @@ import { formatDiffPretty } from '@/utils/diff-formatters'
 import { sanitizeCDATA, escapeXML } from '@/utils/shell-safety'
 import { formatDate } from '@/utils/formatters'
 import { getChangeIdFromHead, GitError, NoChangeIdError } from '@/utils/git-commit'
-import { writeFileSync } from 'node:fs'
 
 export const SHOW_HELP_TEXT = `
 Examples:
@@ -34,6 +33,13 @@ interface ShowOptions {
   json?: boolean
 }
 
+interface ReviewerIdentity {
+  accountId?: number
+  name?: string
+  email?: string
+  username?: string
+}
+
 interface ChangeDetails {
   id: string
   number: number
@@ -49,6 +55,24 @@ interface ChangeDetails {
   updated?: string
   commitMessage: string
   topic?: string
+  reviewers: ReviewerIdentity[]
+  ccs: ReviewerIdentity[]
+}
+
+const formatReviewerLabel = (reviewer: ReviewerIdentity): string => {
+  const preferredIdentity = reviewer.name || reviewer.email || reviewer.username
+  if (!preferredIdentity) {
+    if (reviewer.accountId !== undefined) {
+      return `Account ${reviewer.accountId}`
+    }
+    return 'Unknown Reviewer'
+  }
+
+  if (reviewer.email && reviewer.name && reviewer.name !== reviewer.email) {
+    return `${reviewer.name} <${reviewer.email}>`
+  }
+
+  return preferredIdentity
 }
 
 const getChangeDetails = (
@@ -57,6 +81,20 @@ const getChangeDetails = (
   Effect.gen(function* () {
     const gerritApi = yield* GerritApiService
     const change = yield* gerritApi.getChange(changeId)
+
+    let reviewerMap = change.reviewers
+    const hasReviewerData =
+      (reviewerMap?.REVIEWER?.length ?? 0) > 0 || (reviewerMap?.CC?.length ?? 0) > 0
+
+    if (!hasReviewerData) {
+      const detailedChanges = yield* gerritApi
+        .listChanges(`change:${change.change_id}`)
+        .pipe(Effect.catchAll(() => Effect.succeed([])))
+      const detailedChange =
+        detailedChanges.find((candidate) => candidate.change_id === change.change_id) ||
+        detailedChanges[0]
+      reviewerMap = detailedChange?.reviewers
+    }
 
     return {
       id: change.change_id,
@@ -73,6 +111,18 @@ const getChangeDetails = (
       updated: change.updated,
       commitMessage: change.subject, // For now, using subject as commit message
       topic: change.topic,
+      reviewers: (reviewerMap?.REVIEWER ?? []).map((reviewer) => ({
+        accountId: reviewer._account_id,
+        name: reviewer.name,
+        email: reviewer.email,
+        username: reviewer.username,
+      })),
+      ccs: (reviewerMap?.CC ?? []).map((cc) => ({
+        accountId: cc._account_id,
+        name: cc.name,
+        email: cc.email,
+        username: cc.username,
+      })),
     }
   })
 
@@ -154,6 +204,14 @@ const formatShowPretty = (
   console.log(
     `   Updated: ${changeDetails.updated ? formatDate(changeDetails.updated) : 'Unknown'}`,
   )
+  if (changeDetails.reviewers.length > 0) {
+    console.log(
+      `   Reviewers: ${changeDetails.reviewers.map((reviewer) => formatReviewerLabel(reviewer)).join(', ')}`,
+    )
+  }
+  if (changeDetails.ccs.length > 0) {
+    console.log(`   CCs: ${changeDetails.ccs.map((cc) => formatReviewerLabel(cc)).join(', ')}`)
+  }
   console.log(`   Change-Id: ${changeDetails.id}`)
   console.log()
 
@@ -227,6 +285,22 @@ const formatShowJson = async (
       branch: changeDetails.branch,
       topic: changeDetails.topic,
       owner: removeUndefined(changeDetails.owner),
+      reviewers: changeDetails.reviewers.map((reviewer) =>
+        removeUndefined({
+          account_id: reviewer.accountId,
+          name: reviewer.name,
+          email: reviewer.email,
+          username: reviewer.username,
+        }),
+      ),
+      ccs: changeDetails.ccs.map((cc) =>
+        removeUndefined({
+          account_id: cc.accountId,
+          name: cc.name,
+          email: cc.email,
+          username: cc.username,
+        }),
+      ),
       created: changeDetails.created,
       updated: changeDetails.updated,
     }),
@@ -318,6 +392,44 @@ const formatShowXml = async (
     xmlParts.push(`      <email>${escapeXML(changeDetails.owner.email)}</email>`)
   }
   xmlParts.push(`    </owner>`)
+  xmlParts.push(`    <reviewers>`)
+  xmlParts.push(`      <count>${changeDetails.reviewers.length}</count>`)
+  for (const reviewer of changeDetails.reviewers) {
+    xmlParts.push(`      <reviewer>`)
+    if (reviewer.accountId !== undefined) {
+      xmlParts.push(`        <account_id>${reviewer.accountId}</account_id>`)
+    }
+    if (reviewer.name) {
+      xmlParts.push(`        <name><![CDATA[${sanitizeCDATA(reviewer.name)}]]></name>`)
+    }
+    if (reviewer.email) {
+      xmlParts.push(`        <email>${escapeXML(reviewer.email)}</email>`)
+    }
+    if (reviewer.username) {
+      xmlParts.push(`        <username>${escapeXML(reviewer.username)}</username>`)
+    }
+    xmlParts.push(`      </reviewer>`)
+  }
+  xmlParts.push(`    </reviewers>`)
+  xmlParts.push(`    <ccs>`)
+  xmlParts.push(`      <count>${changeDetails.ccs.length}</count>`)
+  for (const cc of changeDetails.ccs) {
+    xmlParts.push(`      <cc>`)
+    if (cc.accountId !== undefined) {
+      xmlParts.push(`        <account_id>${cc.accountId}</account_id>`)
+    }
+    if (cc.name) {
+      xmlParts.push(`        <name><![CDATA[${sanitizeCDATA(cc.name)}]]></name>`)
+    }
+    if (cc.email) {
+      xmlParts.push(`        <email>${escapeXML(cc.email)}</email>`)
+    }
+    if (cc.username) {
+      xmlParts.push(`        <username>${escapeXML(cc.username)}</username>`)
+    }
+    xmlParts.push(`      </cc>`)
+  }
+  xmlParts.push(`    </ccs>`)
   xmlParts.push(`    <created>${escapeXML(changeDetails.created || '')}</created>`)
   xmlParts.push(`    <updated>${escapeXML(changeDetails.updated || '')}</updated>`)
   xmlParts.push(`  </change>`)

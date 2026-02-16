@@ -14,22 +14,33 @@ const ChangeInfo = Schema.Struct({
   _number: Schema.Number,         // Numeric change ID
   project: Schema.String,         // Project name
   branch: Schema.String,          // Target branch
+  change_id: Schema.String,       // Gerrit Change-Id
   topic: Schema.optional(Schema.String),
   subject: Schema.String,         // First line of commit message
   status: Schema.Literal('NEW', 'MERGED', 'ABANDONED', 'DRAFT'),
-  created: Schema.String,         // ISO timestamp
-  updated: Schema.String,         // ISO timestamp
-  submitted: Schema.optional(Schema.String),
-  submitter: Schema.optional(AccountInfo),
-  owner: AccountInfo,
+  created: Schema.optional(Schema.String),
+  updated: Schema.optional(Schema.String),
+  owner: Schema.optional(AccountInfo),
   current_revision: Schema.optional(Schema.String),
   revisions: Schema.optional(Schema.Record(Schema.String, RevisionInfo)),
   labels: Schema.optional(Schema.Record(Schema.String, LabelInfo)),
-  reviewers: Schema.optional(ReviewerMap),
-  messages: Schema.optional(Schema.Array(ChangeMessage)),
-  mergeable: Schema.optional(Schema.Boolean),
+  reviewers: Schema.optional(ReviewerStateMap),
+  submittable: Schema.optional(Schema.Boolean),
+  work_in_progress: Schema.optional(Schema.Boolean),
   insertions: Schema.optional(Schema.Number),
   deletions: Schema.optional(Schema.Number),
+})
+```
+
+### ReviewerStateMap
+
+Reviewer assignments grouped by Gerrit reviewer state.
+
+```typescript
+const ReviewerStateMap = Schema.Struct({
+  REVIEWER: Schema.optional(Schema.Array(AccountInfo)),
+  CC: Schema.optional(Schema.Array(AccountInfo)),
+  REMOVED: Schema.optional(Schema.Array(AccountInfo)),
 })
 ```
 
