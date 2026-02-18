@@ -135,11 +135,9 @@ export const getHooksDir = (): string => {
 export interface CommitHookServiceImpl {
   readonly hasHook: () => Effect.Effect<boolean, NotGitRepoError>
   readonly hasChangeId: (commit?: string) => Effect.Effect<boolean, NotGitRepoError>
-  readonly installHook: () => Effect.Effect<
-    void,
-    HookInstallError | NotGitRepoError,
-    ConfigServiceImpl
-  >
+  readonly installHook: (
+    quiet?: boolean,
+  ) => Effect.Effect<void, HookInstallError | NotGitRepoError, ConfigServiceImpl>
   readonly ensureChangeId: () => Effect.Effect<
     void,
     HookInstallError | MissingChangeIdError | NotGitRepoError,
@@ -161,7 +159,7 @@ const CommitHookServiceImplLive: CommitHookServiceImpl = {
       catch: () => new NotGitRepoError({ message: 'Not in a git repository' }),
     }),
 
-  installHook: () =>
+  installHook: (quiet = false) =>
     Effect.gen(function* () {
       const configService = yield* ConfigService
 
@@ -177,7 +175,7 @@ const CommitHookServiceImplLive: CommitHookServiceImpl = {
       const normalizedHost = config.host.replace(/\/$/, '')
       const hookUrl = `${normalizedHost}/tools/hooks/commit-msg`
 
-      yield* Console.log(`Installing commit-msg hook from ${config.host}...`)
+      if (!quiet) yield* Console.log(`Installing commit-msg hook from ${config.host}...`)
 
       const hookContent = yield* Effect.tryPromise({
         try: async () => {
@@ -236,7 +234,7 @@ const CommitHookServiceImplLive: CommitHookServiceImpl = {
           }),
       })
 
-      yield* Console.log('commit-msg hook installed successfully')
+      if (!quiet) yield* Console.log('commit-msg hook installed successfully')
     }),
 
   ensureChangeId: () =>

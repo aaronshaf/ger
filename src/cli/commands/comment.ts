@@ -14,12 +14,19 @@ Examples:
   # Post a line-specific comment
   $ ger comment 12345 --file src/main.js --line 42 -m "Consider using const here"
 
+  # Reply to a specific comment thread (resolves the thread by default)
+  $ ger comment 12345 --file src/main.js --line 42 --reply-to 37935b71_9e79a76c -m "Done, fixed"
+
+  # Reply but keep the thread unresolved
+  $ ger comment 12345 --file src/main.js --line 42 --reply-to 37935b71_9e79a76c --unresolved -m "What do you think?"
+
   # Post multiple comments using batch mode
   $ echo '{"message": "Review complete", "comments": [
       {"file": "src/main.js", "line": 10, "message": "Good refactor"}
     ]}' | ger comment 12345 --batch
 
-Note: Line numbers refer to the NEW version of the file, not diff line numbers.`
+Note: Line numbers refer to the NEW version of the file, not diff line numbers.
+Note: Comment IDs for --reply-to can be found in \`ger comments --xml\` or \`ger comments --json\` output (<id> / "id" field).`
 
 interface CommentOptions {
   message?: string
@@ -27,6 +34,7 @@ interface CommentOptions {
   json?: boolean
   file?: string
   line?: number
+  replyTo?: string
   unresolved?: boolean
   batch?: boolean
 }
@@ -186,6 +194,21 @@ export const createReviewInputFromString = (
 }
 
 const createReviewInput = (options: CommentOptions): Effect.Effect<ReviewInput, Error> => {
+  // Validate --reply-to constraints early
+  if (options.replyTo !== undefined) {
+    if (options.batch) {
+      return Effect.fail(new Error('--reply-to cannot be used with --batch'))
+    }
+    if (!(options.file && options.line)) {
+      return Effect.fail(new Error('--reply-to requires --file and --line'))
+    }
+    if (options.replyTo.trim().length === 0) {
+      return Effect.fail(new Error('--reply-to comment ID cannot be empty'))
+    }
+    // Normalize to trimmed value so the payload never contains leading/trailing whitespace
+    options = { ...options, replyTo: options.replyTo.trim() }
+  }
+
   // Batch mode
   if (options.batch) {
     return pipe(
@@ -227,7 +250,13 @@ const createReviewInput = (options: CommentOptions): Effect.Effect<ReviewInput, 
               {
                 line: options.line,
                 message: options.message,
-                unresolved: options.unresolved,
+                ...(options.replyTo !== undefined ? { in_reply_to: options.replyTo } : {}),
+                // When replying, default unresolved to false (resolves the thread) unless explicitly set
+                ...(options.replyTo !== undefined
+                  ? { unresolved: options.unresolved ?? false }
+                  : options.unresolved !== undefined
+                    ? { unresolved: options.unresolved }
+                    : {}),
               },
             ],
           },
@@ -429,8 +458,14 @@ const formatXmlOutput = (
       lines.push(`  <comment>`)
       lines.push(`    <file>${options.file}</file>`)
       lines.push(`    <line>${options.line}</line>`)
+      if (options.replyTo) lines.push(`    <in_reply_to>${options.replyTo}</in_reply_to>`)
       lines.push(`    <message><![CDATA[${options.message}]]></message>`)
-      if (options.unresolved) lines.push(`    <unresolved>true</unresolved>`)
+      // Always emit unresolved when replying so callers know thread resolution state
+      if (options.replyTo !== undefined) {
+        lines.push(`    <unresolved>${(options.unresolved ?? false).toString()}</unresolved>`)
+      } else if (options.unresolved) {
+        lines.push(`    <unresolved>true</unresolved>`)
+      }
       lines.push(`  </comment>`)
     } else {
       lines.push(`  <message><![CDATA[${options.message}]]></message>`)
@@ -460,6 +495,10 @@ const formatHumanOutput = (
       console.log(`Posted ${totalComments} line comment(s)`)
     } else if (options.file && options.line) {
       console.log(`File: ${options.file}, Line: ${options.line}`)
+      if (options.replyTo) {
+        const resolved = !(options.unresolved ?? false)
+        console.log(`Reply to: ${options.replyTo} (thread ${resolved ? 'resolved' : 'unresolved'})`)
+      }
       console.log(`Message: ${options.message}`)
       if (options.unresolved) console.log(`Status: Unresolved`)
     }
@@ -496,8 +535,14 @@ const formatJsonOutput = (
       output.comment = {
         file: options.file,
         line: options.line,
+        ...(options.replyTo ? { in_reply_to: options.replyTo } : {}),
         message: options.message,
-        ...(options.unresolved ? { unresolved: true } : {}),
+        // Always include unresolved when replying so callers know thread resolution state
+        ...(options.replyTo !== undefined
+          ? { unresolved: options.unresolved ?? false }
+          : options.unresolved
+            ? { unresolved: true }
+            : {}),
       }
     } else {
       output.message = options.message

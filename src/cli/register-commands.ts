@@ -59,6 +59,10 @@ async function executeEffect<E>(
   options: { xml?: boolean; json?: boolean },
   resultTag: string,
 ): Promise<void> {
+  if (options.xml && options.json) {
+    outputError(new Error('--xml and --json are mutually exclusive'), options, resultTag)
+    process.exit(1)
+  }
   try {
     await Effect.runPromise(effect)
   } catch (error) {
@@ -111,6 +115,10 @@ export function registerCommands(program: Command): void {
       '--line <line>',
       'Line number in the NEW version of the file (not diff line numbers)',
       parseInt,
+    )
+    .option(
+      '--reply-to <comment-id>',
+      'Reply to a comment thread (requires --file and --line; resolves thread by default)',
     )
     .option('--unresolved', 'Mark comment as unresolved (requires human attention)')
     .option('--batch', 'Read batch comments from stdin as JSON (see examples below)')
@@ -648,7 +656,6 @@ This command uses AI (claude CLI, gemini CLI, or opencode CLI) to review a Gerri
 It performs a two-stage review process:
 1. Generates inline comments for specific code issues
 2. Generates an overall review comment
-
 By default, the review is only displayed in the terminal.
 Use --comment to post the review to Gerrit (with confirmation prompts).
 Use --comment --yes to post without confirmation.

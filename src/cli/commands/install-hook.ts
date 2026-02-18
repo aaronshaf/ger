@@ -53,13 +53,13 @@ export const installHookCommand = (
     }
 
     if (hookExists && options.force) {
-      if (!options.xml) {
+      if (!options.xml && !options.json) {
         yield* Console.log(chalk.yellow('Overwriting existing commit-msg hook...'))
       }
     }
 
-    // Install the hook (service logs progress messages in non-XML mode)
-    yield* commitHookService.installHook()
+    const quiet = options.xml === true || options.json === true
+    yield* commitHookService.installHook(quiet)
 
     // Only output JSON/XML here - service already logs success message for plain mode
     if (options.json) {

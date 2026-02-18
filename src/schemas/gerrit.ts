@@ -308,6 +308,7 @@ export const ReviewInput: Schema.Schema<{
       readonly message: string
       readonly side?: 'PARENT' | 'REVISION'
       readonly unresolved?: boolean
+      readonly in_reply_to?: string
     }>
   >
 }> = Schema.Struct({
@@ -330,6 +331,7 @@ export const ReviewInput: Schema.Schema<{
           message: Schema.String,
           side: Schema.optional(Schema.Literal('PARENT', 'REVISION')),
           unresolved: Schema.optional(Schema.Boolean),
+          in_reply_to: Schema.optional(Schema.String),
         }),
       ),
     }),

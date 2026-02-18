@@ -12,6 +12,16 @@ async function executeEffect<E>(
   options: { xml?: boolean; json?: boolean },
   resultTag: string,
 ): Promise<void> {
+  if (options.xml && options.json) {
+    console.log(
+      JSON.stringify(
+        { status: 'error', error: '--xml and --json are mutually exclusive' },
+        null,
+        2,
+      ),
+    )
+    process.exit(1)
+  }
   try {
     await Effect.runPromise(effect)
   } catch (error) {

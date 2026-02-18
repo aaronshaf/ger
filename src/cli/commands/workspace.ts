@@ -155,7 +155,7 @@ export const workspaceCommand = (
 
     // Fetch the change ref
     const changeRef = revision.ref
-    if (!options.xml) {
+    if (!options.xml && !options.json) {
       console.log(`Fetching change ${change._number}: ${change.subject}`)
     }
 
@@ -173,7 +173,7 @@ export const workspaceCommand = (
     }
 
     // Create worktree
-    if (!options.xml) {
+    if (!options.xml && !options.json) {
       console.log(`Creating worktree at: ${workspaceDir}`)
     }
 
