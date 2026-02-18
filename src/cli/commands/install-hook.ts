@@ -11,6 +11,7 @@ import { type ConfigError, type ConfigServiceImpl } from '@/services/config'
 export interface InstallHookOptions {
   force?: boolean
   xml?: boolean
+  json?: boolean
 }
 
 export type InstallHookErrors = ConfigError | HookInstallError | NotGitRepoError
@@ -25,7 +26,19 @@ export const installHookCommand = (
     const hookExists = yield* commitHookService.hasHook()
 
     if (hookExists && !options.force) {
-      if (options.xml) {
+      if (options.json) {
+        yield* Console.log(
+          JSON.stringify(
+            {
+              status: 'skipped',
+              message: 'commit-msg hook already installed',
+              hint: 'Use --force to overwrite',
+            },
+            null,
+            2,
+          ),
+        )
+      } else if (options.xml) {
         yield* Console.log('<?xml version="1.0" encoding="UTF-8"?>')
         yield* Console.log('<install_hook_result>')
         yield* Console.log('  <status>skipped</status>')
@@ -48,8 +61,16 @@ export const installHookCommand = (
     // Install the hook (service logs progress messages in non-XML mode)
     yield* commitHookService.installHook()
 
-    // Only output XML here - service already logs success message for non-XML mode
-    if (options.xml) {
+    // Only output JSON/XML here - service already logs success message for plain mode
+    if (options.json) {
+      yield* Console.log(
+        JSON.stringify(
+          { status: 'success', message: 'commit-msg hook installed successfully' },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       yield* Console.log('<?xml version="1.0" encoding="UTF-8"?>')
       yield* Console.log('<install_hook_result>')
       yield* Console.log('  <status>success</status>')

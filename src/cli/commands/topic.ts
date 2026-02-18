@@ -22,6 +22,7 @@ Note: When no change-id is provided, it will be auto-detected from the HEAD comm
 
 interface TopicOptions {
   xml?: boolean
+  json?: boolean
   delete?: boolean
 }
 
@@ -52,7 +53,15 @@ export const topicCommand = (
     if (options.delete) {
       yield* gerritApi.deleteTopic(resolvedChangeId)
 
-      if (options.xml) {
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            { status: 'success', action: 'deleted', change_id: resolvedChangeId },
+            null,
+            2,
+          ),
+        )
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<topic_result>`)
         console.log(`  <status>success</status>`)
@@ -69,7 +78,15 @@ export const topicCommand = (
     if (topic !== undefined && topic.trim() !== '') {
       const newTopic = yield* gerritApi.setTopic(resolvedChangeId, topic)
 
-      if (options.xml) {
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            { status: 'success', action: 'set', change_id: resolvedChangeId, topic: newTopic },
+            null,
+            2,
+          ),
+        )
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<topic_result>`)
         console.log(`  <status>success</status>`)
@@ -86,7 +103,20 @@ export const topicCommand = (
     // Handle get operation (default)
     const currentTopic = yield* gerritApi.getTopic(resolvedChangeId)
 
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            action: 'get',
+            change_id: resolvedChangeId,
+            topic: currentTopic || null,
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<topic_result>`)
       console.log(`  <status>success</status>`)

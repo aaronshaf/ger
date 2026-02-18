@@ -33,10 +33,16 @@ import { sanitizeCDATA } from '@/utils/shell-safety'
 import { registerGroupCommands } from './register-group-commands'
 import { registerReviewerCommands } from './register-reviewer-commands'
 
-// Helper function to output error in plain text or XML format
-function outputError(error: unknown, options: { xml?: boolean }, resultTag: string): void {
+// Helper function to output error in plain text, JSON, or XML format
+function outputError(
+  error: unknown,
+  options: { xml?: boolean; json?: boolean },
+  resultTag: string,
+): void {
   const errorMessage = error instanceof Error ? error.message : String(error)
-  if (options.xml) {
+  if (options.json) {
+    console.log(JSON.stringify({ status: 'error', error: errorMessage }, null, 2))
+  } else if (options.xml) {
     console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
     console.log(`<${resultTag}>`)
     console.log(`  <status>error</status>`)
@@ -50,7 +56,7 @@ function outputError(error: unknown, options: { xml?: boolean }, resultTag: stri
 // Helper function to execute Effect with standard error handling
 async function executeEffect<E>(
   effect: Effect.Effect<void, E, never>,
-  options: { xml?: boolean },
+  options: { xml?: boolean; json?: boolean },
   resultTag: string,
 ): Promise<void> {
   try {
@@ -83,6 +89,7 @@ export function registerCommands(program: Command): void {
     .command('status')
     .description('Check connection status')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (options) => {
       await executeEffect(
         statusCommand(options).pipe(
@@ -108,6 +115,7 @@ export function registerCommands(program: Command): void {
     .option('--unresolved', 'Mark comment as unresolved (requires human attention)')
     .option('--batch', 'Read batch comments from stdin as JSON (see examples below)')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .addHelpText('after', COMMENT_HELP_TEXT)
     .action(async (changeId, options) => {
       await executeEffect(
@@ -125,6 +133,7 @@ export function registerCommands(program: Command): void {
     .command('diff <change-id>')
     .description('Get diff for a change (accepts change number or Change-ID)')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .option('--file <file>', 'Specific file to diff')
     .option('--files-only', 'List changed files only')
     .option('--format <format>', 'Output format (unified, json, files)')
@@ -144,6 +153,7 @@ export function registerCommands(program: Command): void {
     .command('mine')
     .description('Show your open changes')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (options) => {
       await executeEffect(
         mineCommand(options).pipe(
@@ -160,6 +170,7 @@ export function registerCommands(program: Command): void {
     .command('search [query]')
     .description('Search changes using Gerrit query syntax')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .option('-n, --limit <number>', 'Limit results (default: 25)')
     .addHelpText('after', SEARCH_HELP_TEXT)
     .action(async (query, options) => {
@@ -168,16 +179,17 @@ export function registerCommands(program: Command): void {
         Effect.provide(ConfigServiceLive),
       )
       await Effect.runPromise(effect).catch((error: unknown) => {
-        if (options.xml) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (options.json) {
+          console.log(JSON.stringify({ status: 'error', error: errorMessage }, null, 2))
+        } else if (options.xml) {
           console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
           console.log(`<search_result>`)
           console.log(`  <status>error</status>`)
-          console.log(
-            `  <error><![CDATA[${error instanceof Error ? error.message : String(error)}]]></error>`,
-          )
+          console.log(`  <error><![CDATA[${errorMessage}]]></error>`)
           console.log(`</search_result>`)
         } else {
-          console.error('✗ Error:', error instanceof Error ? error.message : String(error))
+          console.error('✗ Error:', errorMessage)
         }
         process.exit(1)
       })
@@ -190,6 +202,7 @@ export function registerCommands(program: Command): void {
       'Create or switch to a git worktree for a Gerrit change (accepts change number or Change-ID)',
     )
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
         workspaceCommand(changeId, options).pipe(
@@ -206,6 +219,7 @@ export function registerCommands(program: Command): void {
     .command('incoming')
     .description('Show incoming changes for review (where you are a reviewer)')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .option('-i, --interactive', 'Interactive mode with detailed view and diff')
     .action(async (options) => {
       await executeEffect(
@@ -226,6 +240,7 @@ export function registerCommands(program: Command): void {
     )
     .option('-m, --message <message>', 'Abandon message')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
         abandonCommand(changeId, options).pipe(
@@ -243,6 +258,7 @@ export function registerCommands(program: Command): void {
     .description('Restore an abandoned change (accepts change number or Change-ID)')
     .option('-m, --message <message>', 'Restoration message')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
         restoreCommand(changeId, options).pipe(
@@ -260,6 +276,7 @@ export function registerCommands(program: Command): void {
     .description('Rebase a change onto target branch (auto-detects from HEAD if not provided)')
     .option('--base <ref>', 'Base revision to rebase onto (default: target branch HEAD)')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
         rebaseCommand(changeId, options).pipe(
@@ -276,6 +293,7 @@ export function registerCommands(program: Command): void {
     .command('submit <change-id>')
     .description('Submit a change for merging (accepts change number or Change-ID)')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
         submitCommand(changeId, options).pipe(
@@ -293,6 +311,7 @@ export function registerCommands(program: Command): void {
     .description('Get, set, or remove topic for a change (auto-detects from HEAD if not specified)')
     .option('--delete', 'Remove the topic from the change')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .addHelpText('after', TOPIC_HELP_TEXT)
     .action(async (changeId, topic, options) => {
       await executeEffect(
@@ -314,6 +333,7 @@ export function registerCommands(program: Command): void {
     .option('--label <name> <value>', 'Custom label vote (can be used multiple times)')
     .option('-m, --message <message>', 'Comment with vote')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
         voteCommand(changeId, options).pipe(
@@ -334,6 +354,7 @@ export function registerCommands(program: Command): void {
     .description('List Gerrit projects')
     .option('--pattern <regex>', 'Filter projects by name pattern')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (options) => {
       await executeEffect(
         projectsCommand(options).pipe(
@@ -355,6 +376,7 @@ export function registerCommands(program: Command): void {
       'Show all comments on a change with diff context (accepts change number or Change-ID)',
     )
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
         commentsCommand(changeId, options).pipe(
@@ -523,6 +545,7 @@ Note:
     .description('Install the Gerrit commit-msg hook for automatic Change-Id generation')
     .option('--force', 'Overwrite existing hook')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .addHelpText(
       'after',
       `
@@ -623,7 +646,6 @@ Note:
       `
 This command uses AI (claude CLI, gemini CLI, or opencode CLI) to review a Gerrit change.
 It performs a two-stage review process:
-
 1. Generates inline comments for specific code issues
 2. Generates an overall review comment
 
@@ -636,22 +658,11 @@ Requirements:
   - Gerrit credentials must be configured (run 'ger setup' first)
 
 Examples:
-  # Review a change using change number (display only)
   $ ger review 12345
-
-  # Review using Change-ID
   $ ger review If5a3ae8cb5a107e187447802358417f311d0c4b1
-
-  # Review and prompt to post comments
   $ ger review 12345 --comment
-
-  # Review and auto-post comments without prompting
   $ ger review 12345 --comment --yes
-
-  # Use specific AI tool
   $ ger review 12345 --tool gemini
-
-  # Show debug output to troubleshoot issues
   $ ger review 12345 --debug
 
 Note: Both change number (e.g., 12345) and Change-ID (e.g., If5a3ae8...) formats are accepted

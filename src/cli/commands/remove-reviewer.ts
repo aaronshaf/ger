@@ -6,6 +6,7 @@ interface RemoveReviewerOptions {
   change?: string
   notify?: string
   xml?: boolean
+  json?: boolean
 }
 
 type NotifyLevel = 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL'
@@ -21,6 +22,10 @@ const outputXmlError = (message: string): void => {
   console.log(`  <status>error</status>`)
   console.log(`  <error><![CDATA[${sanitizeCDATA(message)}]]></error>`)
   console.log(`</remove_reviewer_result>`)
+}
+
+const outputJsonError = (message: string): void => {
+  console.log(JSON.stringify({ status: 'error', error: message }, null, 2))
 }
 
 class ValidationError extends Error {
@@ -39,7 +44,9 @@ export const removeReviewerCommand = (
     if (!changeId) {
       const message =
         'Change ID is required. Use -c <change-id> or run from a branch with an active change.'
-      if (options.xml) {
+      if (options.json) {
+        outputJsonError(message)
+      } else if (options.xml) {
         outputXmlError(message)
       } else {
         console.error(`✗ ${message}`)
@@ -49,7 +56,9 @@ export const removeReviewerCommand = (
 
     if (reviewers.length === 0) {
       const message = 'At least one reviewer is required.'
-      if (options.xml) {
+      if (options.json) {
+        outputJsonError(message)
+      } else if (options.xml) {
         outputXmlError(message)
       } else {
         console.error(`✗ ${message}`)
@@ -62,7 +71,9 @@ export const removeReviewerCommand = (
       const upperNotify = options.notify.toUpperCase()
       if (!isValidNotifyLevel(upperNotify)) {
         const message = `Invalid notify level: ${options.notify}. Valid values: none, owner, owner_reviewers, all`
-        if (options.xml) {
+        if (options.json) {
+          outputJsonError(message)
+        } else if (options.xml) {
           outputXmlError(message)
         } else {
           console.error(`✗ ${message}`)
@@ -90,7 +101,24 @@ export const removeReviewerCommand = (
       results.push({ reviewer, success: true })
     }
 
-    if (options.xml) {
+    if (options.json) {
+      const allSuccess = results.every((r) => r.success)
+      console.log(
+        JSON.stringify(
+          {
+            status: allSuccess ? 'success' : 'partial_failure',
+            change_id: changeId,
+            reviewers: results.map((r) =>
+              r.success
+                ? { input: r.reviewer, status: 'removed' }
+                : { input: r.reviewer, error: r.error, status: 'failed' },
+            ),
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<remove_reviewer_result>`)
       console.log(`  <change_id>${escapeXML(changeId)}</change_id>`)

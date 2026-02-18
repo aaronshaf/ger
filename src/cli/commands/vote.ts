@@ -8,6 +8,7 @@ interface VoteOptions {
   label?: string[]
   message?: string
   xml?: boolean
+  json?: boolean
 }
 
 /**
@@ -92,7 +93,20 @@ export const voteCommand = (
     yield* gerritApi.postReview(changeId, reviewInput)
 
     // Output success
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            change_id: changeId,
+            labels,
+            ...(options.message ? { message: options.message } : {}),
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<vote_result>`)
       console.log(`  <status>success</status>`)

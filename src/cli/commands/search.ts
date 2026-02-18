@@ -46,6 +46,7 @@ Full query syntax: https://gerrit-review.googlesource.com/Documentation/user-sea
 
 interface SearchOptions {
   xml?: boolean
+  json?: boolean
   limit?: string
 }
 
@@ -93,7 +94,27 @@ export const searchCommand = (
     // Group changes by project (used by both output formats)
     const groupedChanges = changes.length > 0 ? groupChangesByProject(changes) : []
 
-    if (options.xml) {
+    if (options.json) {
+      // JSON output
+      const jsonOutput = {
+        status: 'success',
+        query: finalQuery,
+        count: changes.length,
+        changes: groupedChanges.flatMap(({ project, changes: projectChanges }) =>
+          projectChanges.map((change) => ({
+            number: change._number,
+            subject: change.subject,
+            status: change.status,
+            project,
+            branch: change.branch,
+            owner: change.owner?.name ?? 'Unknown',
+            ...(change.owner?.email ? { owner_email: change.owner.email } : {}),
+            ...(change.updated ? { updated: change.updated } : {}),
+          })),
+        ),
+      }
+      console.log(JSON.stringify(jsonOutput, null, 2))
+    } else if (options.xml) {
       // XML output
       const xmlOutput = [
         '<?xml version="1.0" encoding="UTF-8"?>',

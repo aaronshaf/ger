@@ -6,6 +6,7 @@ import { getDiffContext } from '@/utils/diff-context'
 
 interface CommentsOptions {
   xml?: boolean
+  json?: boolean
 }
 
 const getCommentsForChange = (
@@ -63,7 +64,36 @@ export const commentsCommand = (
     })
 
     // Format output
-    if (options.xml) {
+    if (options.json) {
+      const jsonOutput = {
+        status: 'success',
+        change_id: changeId,
+        comment_count: commentsWithContext.length,
+        comments: commentsWithContext.map(({ comment, context }) => ({
+          id: comment.id,
+          ...(comment.path ? { path: comment.path } : {}),
+          ...(comment.line ? { line: comment.line } : {}),
+          ...(comment.range ? { range: comment.range } : {}),
+          ...(comment.author
+            ? {
+                author: {
+                  ...(comment.author.name ? { name: comment.author.name } : {}),
+                  ...(comment.author.email ? { email: comment.author.email } : {}),
+                  ...(comment.author._account_id !== undefined
+                    ? { account_id: comment.author._account_id }
+                    : {}),
+                },
+              }
+            : {}),
+          ...(comment.updated ? { updated: comment.updated } : {}),
+          ...(comment.unresolved !== undefined ? { unresolved: comment.unresolved } : {}),
+          ...(comment.in_reply_to ? { in_reply_to: comment.in_reply_to } : {}),
+          message: comment.message,
+          ...(context ? { diff_context: context } : {}),
+        })),
+      }
+      console.log(JSON.stringify(jsonOutput, null, 2))
+    } else if (options.xml) {
       formatCommentsXml(changeId, commentsWithContext)
     } else {
       formatCommentsPretty(commentsWithContext)
@@ -71,7 +101,9 @@ export const commentsCommand = (
   }).pipe(
     // Regional error boundary for the entire command
     Effect.catchTag('ApiError', (error) => {
-      if (options.xml) {
+      if (options.json) {
+        console.log(JSON.stringify({ status: 'error', error: error.message }, null, 2))
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<comments_result>`)
         console.log(`  <status>error</status>`)

@@ -4,6 +4,7 @@ import { type ApiError, GerritApiService } from '@/api/gerrit'
 interface RestoreOptions {
   message?: string
   xml?: boolean
+  json?: boolean
 }
 
 /**
@@ -31,7 +32,20 @@ export const restoreCommand = (
     // Perform the restore - this returns the restored change info
     const change = yield* gerritApi.restoreChange(changeId, options.message)
 
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            change_number: change._number,
+            subject: change.subject,
+            ...(options.message ? { message: options.message } : {}),
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<restore_result>`)
       console.log(`  <status>success</status>`)

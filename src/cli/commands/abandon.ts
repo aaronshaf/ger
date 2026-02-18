@@ -4,6 +4,7 @@ import { type ApiError, GerritApiService } from '@/api/gerrit'
 interface AbandonOptions {
   message?: string
   xml?: boolean
+  json?: boolean
 }
 
 export const abandonCommand = (
@@ -26,7 +27,20 @@ export const abandonCommand = (
       // Perform the abandon
       yield* gerritApi.abandonChange(changeId, options.message)
 
-      if (options.xml) {
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            {
+              status: 'success',
+              change_number: change._number,
+              subject: change.subject,
+              ...(options.message ? { message: options.message } : {}),
+            },
+            null,
+            2,
+          ),
+        )
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<abandon_result>`)
         console.log(`  <status>success</status>`)
@@ -46,7 +60,19 @@ export const abandonCommand = (
       // If we can't get change details, still try to abandon with just the ID
       yield* gerritApi.abandonChange(changeId, options.message)
 
-      if (options.xml) {
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            {
+              status: 'success',
+              change_id: changeId,
+              ...(options.message ? { message: options.message } : {}),
+            },
+            null,
+            2,
+          ),
+        )
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<abandon_result>`)
         console.log(`  <status>success</status>`)

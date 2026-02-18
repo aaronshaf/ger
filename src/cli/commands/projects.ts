@@ -4,6 +4,7 @@ import { type ApiError, GerritApiService } from '@/api/gerrit'
 interface ProjectsOptions {
   pattern?: string
   xml?: boolean
+  json?: boolean
 }
 
 /**
@@ -27,7 +28,9 @@ export const projectsCommand = (
 
     // Handle empty results
     if (projects.length === 0) {
-      if (options.xml) {
+      if (options.json) {
+        console.log(JSON.stringify({ status: 'success', projects: [] }, null, 2))
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<projects_result>`)
         console.log(`  <status>success</status>`)
@@ -40,7 +43,24 @@ export const projectsCommand = (
     }
 
     // Output results
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            count: projects.length,
+            projects: projects.map((project) => ({
+              id: project.id,
+              name: project.name,
+              ...(project.parent ? { parent: project.parent } : {}),
+              ...(project.state ? { state: project.state } : {}),
+            })),
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<projects_result>`)
       console.log(`  <status>success</status>`)

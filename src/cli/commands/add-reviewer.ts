@@ -6,6 +6,7 @@ interface AddReviewerOptions {
   cc?: boolean
   notify?: string
   xml?: boolean
+  json?: boolean
   group?: boolean
 }
 
@@ -24,6 +25,10 @@ const outputXmlError = (message: string): void => {
   console.log(`</add_reviewer_result>`)
 }
 
+const outputJsonError = (message: string): void => {
+  console.log(JSON.stringify({ status: 'error', error: message }, null, 2))
+}
+
 class ValidationError extends Error {
   readonly _tag = 'ValidationError'
 }
@@ -40,7 +45,9 @@ export const addReviewerCommand = (
     if (!changeId) {
       const message =
         'Change ID is required. Use -c <change-id> or run from a branch with an active change.'
-      if (options.xml) {
+      if (options.json) {
+        outputJsonError(message)
+      } else if (options.xml) {
         outputXmlError(message)
       } else {
         console.error(`✗ ${message}`)
@@ -51,7 +58,9 @@ export const addReviewerCommand = (
     if (reviewers.length === 0) {
       const entityType = options.group ? 'group' : 'reviewer'
       const message = `At least one ${entityType} is required.`
-      if (options.xml) {
+      if (options.json) {
+        outputJsonError(message)
+      } else if (options.xml) {
         outputXmlError(message)
       } else {
         console.error(`✗ ${message}`)
@@ -67,7 +76,9 @@ export const addReviewerCommand = (
       const emailLikeInputs = reviewers.filter((r) => r.includes('@'))
       if (emailLikeInputs.length > 0) {
         const message = `The --group flag expects group identifiers, but received email-like input: ${emailLikeInputs.join(', ')}. Did you mean to omit --group?`
-        if (options.xml) {
+        if (options.json) {
+          outputJsonError(message)
+        } else if (options.xml) {
           outputXmlError(message)
         } else {
           console.error(`✗ ${message}`)
@@ -85,7 +96,9 @@ export const addReviewerCommand = (
       const upperNotify = options.notify.toUpperCase()
       if (!VALID_NOTIFY_LEVELS.includes(upperNotify as NotifyLevel)) {
         const message = `Invalid notify level: ${options.notify}. Valid values: none, owner, owner_reviewers, all`
-        if (options.xml) {
+        if (options.json) {
+          outputJsonError(message)
+        } else if (options.xml) {
           outputXmlError(message)
         } else {
           console.error(`✗ ${message}`)
@@ -120,7 +133,26 @@ export const addReviewerCommand = (
       }
     }
 
-    if (options.xml) {
+    if (options.json) {
+      const allSuccess = results.every((r) => r.success)
+      console.log(
+        JSON.stringify(
+          {
+            status: allSuccess ? 'success' : 'partial_failure',
+            change_id: changeId,
+            state,
+            entity_type: entityType,
+            reviewers: results.map((r) =>
+              r.success
+                ? { input: r.reviewer, name: r.name, status: 'added' }
+                : { input: r.reviewer, error: r.error, status: 'failed' },
+            ),
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<add_reviewer_result>`)
       console.log(`  <change_id>${escapeXml(changeId)}</change_id>`)

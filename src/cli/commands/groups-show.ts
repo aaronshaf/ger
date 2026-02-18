@@ -4,6 +4,7 @@ import { sanitizeCDATA } from '@/utils/shell-safety'
 
 interface GroupsShowOptions {
   xml?: boolean
+  json?: boolean
 }
 
 /**
@@ -25,7 +26,9 @@ export const groupsShowCommand = (
     const group = yield* gerritApi.getGroupDetail(groupId).pipe(
       Effect.catchTag('ApiError', (error) =>
         Effect.gen(function* () {
-          if (options.xml) {
+          if (options.json) {
+            console.log(JSON.stringify({ status: 'error', error: error.message }, null, 2))
+          } else if (options.xml) {
             console.log('<?xml version="1.0" encoding="UTF-8"?>')
             console.log('<group_detail_result>')
             console.log('  <status>error</status>')
@@ -46,7 +49,40 @@ export const groupsShowCommand = (
     )
 
     // Output results
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            group: {
+              id: group.id,
+              ...(group.name ? { name: group.name } : {}),
+              ...(group.description ? { description: group.description } : {}),
+              ...(group.owner ? { owner: group.owner } : {}),
+              ...(group.owner_id ? { owner_id: group.owner_id } : {}),
+              ...(group.group_id !== undefined ? { group_id: group.group_id } : {}),
+              ...(group.options?.visible_to_all !== undefined
+                ? { visible_to_all: group.options.visible_to_all }
+                : {}),
+              ...(group.created_on ? { created_on: group.created_on } : {}),
+              ...(group.url ? { url: group.url } : {}),
+              members: (group.members ?? []).map((member) => ({
+                account_id: member._account_id,
+                ...(member.name ? { name: member.name } : {}),
+                ...(member.email ? { email: member.email } : {}),
+                ...(member.username ? { username: member.username } : {}),
+              })),
+              subgroups: (group.includes ?? []).map((subgroup) => ({
+                id: subgroup.id,
+                ...(subgroup.name ? { name: subgroup.name } : {}),
+              })),
+            },
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<group_detail_result>`)
       console.log(`  <status>success</status>`)

@@ -7,6 +7,7 @@ import { type ConfigError, ConfigService } from '@/services/config'
 
 interface WorkspaceOptions {
   xml?: boolean
+  json?: boolean
 }
 
 const parseChangeSpec = (changeSpec: string): { changeId: string; patchset?: string } => {
@@ -129,7 +130,11 @@ export const workspaceCommand = (
 
     // Check if worktree already exists
     if (fs.existsSync(workspaceDir)) {
-      if (options.xml) {
+      if (options.json) {
+        console.log(
+          JSON.stringify({ status: 'success', path: workspaceDir, exists: true }, null, 2),
+        )
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<workspace>`)
         console.log(`  <path>${workspaceDir}</path>`)
@@ -185,7 +190,21 @@ export const workspaceCommand = (
       throw new Error(`Failed to create worktree: ${error}`)
     }
 
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            path: workspaceDir,
+            change_number: change._number,
+            subject: change.subject,
+            created: true,
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<workspace>`)
       console.log(`  <path>${workspaceDir}</path>`)

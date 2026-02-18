@@ -3,6 +3,7 @@ import { GerritApiService } from '@/api/gerrit'
 
 interface StatusOptions {
   xml?: boolean
+  json?: boolean
 }
 
 export const statusCommand = (
@@ -13,7 +14,16 @@ export const statusCommand = (
 
     const isConnected = yield* apiService.testConnection
 
-    if (options.xml) {
+    if (options.json) {
+      // JSON output
+      console.log(
+        JSON.stringify(
+          { status: isConnected ? 'success' : 'error', connected: isConnected },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       // XML output for LLM consumption
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<status_result>`)

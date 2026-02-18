@@ -8,14 +8,16 @@ import { removeReviewerCommand } from './commands/remove-reviewer'
 // Helper function to execute Effect with standard error handling
 async function executeEffect<E>(
   effect: Effect.Effect<void, E, never>,
-  options: { xml?: boolean },
+  options: { xml?: boolean; json?: boolean },
   resultTag: string,
 ): Promise<void> {
   try {
     await Effect.runPromise(effect)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    if (options.xml) {
+    if (options.json) {
+      console.log(JSON.stringify({ status: 'error', error: errorMessage }, null, 2))
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<${resultTag}>`)
       console.log(`  <status>error</status>`)
@@ -44,6 +46,7 @@ export function registerReviewerCommands(program: Command): void {
       'Notification level: none, owner, owner_reviewers, all (default: all)',
     )
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .addHelpText(
       'after',
       `
@@ -76,6 +79,7 @@ Examples:
       'Notification level: none, owner, owner_reviewers, all (default: all)',
     )
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .addHelpText(
       'after',
       `

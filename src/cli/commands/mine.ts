@@ -5,6 +5,7 @@ import { colors } from '@/utils/formatters'
 
 interface MineOptions {
   xml?: boolean
+  json?: boolean
 }
 
 // ANSI color codes
@@ -17,7 +18,23 @@ export const mineCommand = (
 
     const changes = yield* gerritApi.listChanges('owner:self status:open')
 
-    if (options.xml) {
+    if (options.json) {
+      const jsonOutput = {
+        status: 'success',
+        count: changes.length,
+        changes: changes.map((change) => ({
+          number: change._number,
+          subject: change.subject,
+          project: change.project,
+          branch: change.branch,
+          status: change.status,
+          change_id: change.change_id,
+          ...(change.updated ? { updated: change.updated } : {}),
+          ...(change.owner?.name ? { owner: change.owner.name } : {}),
+        })),
+      }
+      console.log(JSON.stringify(jsonOutput, null, 2))
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<changes count="${changes.length}">`)
 

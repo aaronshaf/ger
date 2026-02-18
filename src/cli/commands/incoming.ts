@@ -13,6 +13,7 @@ const execAsync = promisify(exec)
 
 interface IncomingOptions {
   xml?: boolean
+  json?: boolean
   interactive?: boolean
 }
 
@@ -161,7 +162,26 @@ export const incomingCommand = (
       return
     }
 
-    if (options.xml) {
+    if (options.json) {
+      // JSON output
+      const groupedChanges = groupChangesByProject(changes)
+      const jsonOutput = {
+        status: 'success',
+        count: changes.length,
+        changes: groupedChanges.flatMap(({ project, changes: projectChanges }) =>
+          projectChanges.map((change) => ({
+            number: change._number,
+            subject: change.subject,
+            status: change.status,
+            project,
+            owner: change.owner?.name ?? 'Unknown',
+            ...(change.owner?.email ? { owner_email: change.owner.email } : {}),
+            ...(change.updated ? { updated: change.updated } : {}),
+          })),
+        ),
+      }
+      console.log(JSON.stringify(jsonOutput, null, 2))
+    } else if (options.xml) {
       // XML output
       const xmlOutput = [
         '<?xml version="1.0" encoding="UTF-8"?>',

@@ -9,14 +9,16 @@ import { groupsMembersCommand } from './commands/groups-members'
 // Helper function to execute Effect with standard error handling
 async function executeEffect<E>(
   effect: Effect.Effect<void, E, never>,
-  options: { xml?: boolean },
+  options: { xml?: boolean; json?: boolean },
   resultTag: string,
 ): Promise<void> {
   try {
     await Effect.runPromise(effect)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    if (options.xml) {
+    if (options.json) {
+      console.log(JSON.stringify({ status: 'error', error: errorMessage }, null, 2))
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<${resultTag}>`)
       console.log(`  <status>error</status>`)
@@ -43,6 +45,7 @@ export function registerGroupCommands(program: Command): void {
     .option('--user <account>', 'Show groups a user belongs to')
     .option('--limit <n>', 'Maximum number of results (default: 25)')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (options) => {
       await executeEffect(
         groupsCommand(options).pipe(
@@ -59,6 +62,7 @@ export function registerGroupCommands(program: Command): void {
     .command('groups-show <group-id>')
     .description('Show detailed information about a Gerrit group')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (groupId, options) => {
       await executeEffect(
         groupsShowCommand(groupId, options).pipe(
@@ -75,6 +79,7 @@ export function registerGroupCommands(program: Command): void {
     .command('groups-members <group-id>')
     .description('List all members of a Gerrit group')
     .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
     .action(async (groupId, options) => {
       await executeEffect(
         groupsMembersCommand(groupId, options).pipe(

@@ -35,7 +35,19 @@ export const diffCommand = (
         ),
       )
 
-    if (validatedOptions.xml) {
+    if (validatedOptions.json) {
+      // JSON output
+      const jsonOutput: Record<string, unknown> = {
+        status: 'success',
+        change_id: changeId,
+      }
+      if (Array.isArray(diff)) {
+        jsonOutput.files = diff
+      } else {
+        jsonOutput.content = diff
+      }
+      console.log(JSON.stringify(jsonOutput, null, 2))
+    } else if (validatedOptions.xml) {
       // XML output for LLM consumption
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<diff_result>`)

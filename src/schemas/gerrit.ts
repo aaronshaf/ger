@@ -519,17 +519,14 @@ export type DiffOptions = Schema.Schema.Type<typeof DiffOptions>
 // Command options schemas
 export const DiffCommandOptions: Schema.Schema<{
   readonly xml?: boolean
+  readonly json?: boolean
   readonly file?: string
   readonly filesOnly?: boolean
   readonly format?: 'unified' | 'json' | 'files'
 }> = Schema.Struct({
   xml: Schema.optional(Schema.Boolean),
-  file: Schema.optional(
-    Schema.String.pipe(
-      Schema.minLength(1),
-      Schema.annotations({ description: 'File path for diff (relative to repo root)' }),
-    ),
-  ),
+  json: Schema.optional(Schema.Boolean),
+  file: Schema.optional(Schema.String.pipe(Schema.minLength(1))),
   filesOnly: Schema.optional(Schema.Boolean),
   format: Schema.optional(DiffFormat),
 })

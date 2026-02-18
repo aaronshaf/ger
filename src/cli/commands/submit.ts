@@ -3,6 +3,7 @@ import { type ApiError, GerritApiService } from '@/api/gerrit'
 
 interface SubmitOptions {
   xml?: boolean
+  json?: boolean
 }
 
 /**
@@ -65,7 +66,21 @@ export const submitCommand = (
         reasons.push('Change does not meet submit requirements')
       }
 
-      if (options.xml) {
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            {
+              status: 'error',
+              change_number: change._number,
+              subject: change.subject,
+              submittable: false,
+              reasons,
+            },
+            null,
+            2,
+          ),
+        )
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<submit_result>`)
         console.log(`  <status>error</status>`)
@@ -93,7 +108,20 @@ export const submitCommand = (
     // Change is submittable, proceed with submission
     const result = yield* gerritApi.submitChange(changeId)
 
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            change_number: change._number,
+            subject: change.subject,
+            submit_status: result.status,
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<submit_result>`)
       console.log(`  <status>success</status>`)

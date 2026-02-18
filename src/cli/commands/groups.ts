@@ -9,6 +9,7 @@ interface GroupsOptions {
   user?: string
   limit?: string
   xml?: boolean
+  json?: boolean
 }
 
 /**
@@ -44,7 +45,9 @@ export const groupsCommand = (
       .pipe(
         Effect.catchTag('ApiError', (error) =>
           Effect.gen(function* () {
-            if (options.xml) {
+            if (options.json) {
+              console.log(JSON.stringify({ status: 'error', error: error.message }, null, 2))
+            } else if (options.xml) {
               console.log('<?xml version="1.0" encoding="UTF-8"?>')
               console.log('<groups_result>')
               console.log('  <status>error</status>')
@@ -64,7 +67,9 @@ export const groupsCommand = (
 
     // Handle empty results
     if (groups.length === 0) {
-      if (options.xml) {
+      if (options.json) {
+        console.log(JSON.stringify({ status: 'success', count: 0, groups: [] }, null, 2))
+      } else if (options.xml) {
         console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
         console.log(`<groups_result>`)
         console.log(`  <status>success</status>`)
@@ -78,7 +83,31 @@ export const groupsCommand = (
     }
 
     // Output results
-    if (options.xml) {
+    if (options.json) {
+      console.log(
+        JSON.stringify(
+          {
+            status: 'success',
+            count: groups.length,
+            groups: groups.map((group) => ({
+              id: group.id,
+              ...(group.name ? { name: group.name } : {}),
+              ...(group.description ? { description: group.description } : {}),
+              ...(group.owner ? { owner: group.owner } : {}),
+              ...(group.owner_id ? { owner_id: group.owner_id } : {}),
+              ...(group.group_id !== undefined ? { group_id: group.group_id } : {}),
+              ...(group.options?.visible_to_all !== undefined
+                ? { visible_to_all: group.options.visible_to_all }
+                : {}),
+              ...(group.created_on ? { created_on: group.created_on } : {}),
+              ...(group.url ? { url: group.url } : {}),
+            })),
+          },
+          null,
+          2,
+        ),
+      )
+    } else if (options.xml) {
       console.log(`<?xml version="1.0" encoding="UTF-8"?>`)
       console.log(`<groups_result>`)
       console.log(`  <status>success</status>`)

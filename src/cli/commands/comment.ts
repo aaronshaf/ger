@@ -24,6 +24,7 @@ Note: Line numbers refer to the NEW version of the file, not diff line numbers.`
 interface CommentOptions {
   message?: string
   xml?: boolean
+  json?: boolean
   file?: string
   line?: number
   unresolved?: boolean
@@ -466,6 +467,45 @@ const formatHumanOutput = (
     // since it was already shown in the "OVERALL REVIEW TO POST" section
   })
 
+// Helper to format JSON output
+const formatJsonOutput = (
+  change: ChangeInfo,
+  review: ReviewInput,
+  options: CommentOptions,
+  changeId: string,
+): Effect.Effect<void> =>
+  Effect.sync(() => {
+    const output: Record<string, unknown> = {
+      status: 'success',
+      change_id: changeId,
+      change_number: change._number,
+      change_subject: change.subject,
+      change_status: change.status,
+    }
+
+    if (options.batch && review.comments) {
+      output.comments = Object.entries(review.comments).flatMap(([file, comments]) =>
+        comments.map((comment) => ({
+          file,
+          ...(comment.line ? { line: comment.line } : {}),
+          message: comment.message,
+          ...(comment.unresolved ? { unresolved: true } : {}),
+        })),
+      )
+    } else if (options.file && options.line) {
+      output.comment = {
+        file: options.file,
+        line: options.line,
+        message: options.message,
+        ...(options.unresolved ? { unresolved: true } : {}),
+      }
+    } else {
+      output.message = options.message
+    }
+
+    console.log(JSON.stringify(output, null, 2))
+  })
+
 // Main output formatter
 const formatOutput = (
   change: ChangeInfo,
@@ -473,6 +513,8 @@ const formatOutput = (
   options: CommentOptions,
   changeId: string,
 ): Effect.Effect<void> =>
-  options.xml
-    ? formatXmlOutput(change, review, options, changeId)
-    : formatHumanOutput(change, review, options)
+  options.json
+    ? formatJsonOutput(change, review, options, changeId)
+    : options.xml
+      ? formatXmlOutput(change, review, options, changeId)
+      : formatHumanOutput(change, review, options)
