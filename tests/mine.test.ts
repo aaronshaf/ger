@@ -131,8 +131,8 @@ describe('mine command', () => {
         _number: 12345,
         subject: 'Labeled change',
         labels: {
-          'Code-Review': { value: 2, default_value: 0 },
-          Verified: { value: -1, default_value: 0 },
+          'Code-Review': { value: 2 },
+          Verified: { value: -1 },
         },
       }),
     ]
