@@ -31,6 +31,7 @@ export const mineCommand = (
           change_id: change.change_id,
           ...(change.updated ? { updated: change.updated } : {}),
           ...(change.owner?.name ? { owner: change.owner.name } : {}),
+          ...(change.labels ? { labels: change.labels } : {}),
         })),
       }
       console.log(JSON.stringify(jsonOutput, null, 2))

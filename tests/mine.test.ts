@@ -125,6 +125,62 @@ describe('mine command', () => {
     expect(output).toContain('</changes>')
   })
 
+  test('should include labels in --json output', async () => {
+    const mockChanges: ChangeInfo[] = [
+      generateMockChange({
+        _number: 12345,
+        subject: 'Labeled change',
+        labels: {
+          'Code-Review': { value: 2, default_value: 0 },
+          Verified: { value: -1, default_value: 0 },
+        },
+      }),
+    ]
+
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChanges)}`)
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    await Effect.runPromise(
+      mineCommand({ json: true }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
+    )
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    const parsed = JSON.parse(output)
+    const change = parsed.changes[0]
+    expect(change.labels).toBeDefined()
+    expect(change.labels['Code-Review'].value).toBe(2)
+    expect(change.labels['Verified'].value).toBe(-1)
+  })
+
+  test('should omit labels key in --json output when change has no labels', async () => {
+    const mockChanges: ChangeInfo[] = [generateMockChange({ _number: 12345 })]
+
+    server.use(
+      http.get('*/a/changes/', () => {
+        return HttpResponse.text(`)]}'\n${JSON.stringify(mockChanges)}`)
+      }),
+    )
+
+    const mockConfigLayer = Layer.succeed(ConfigService, createMockConfigService())
+    await Effect.runPromise(
+      mineCommand({ json: true }).pipe(
+        Effect.provide(GerritApiServiceLive),
+        Effect.provide(mockConfigLayer),
+      ),
+    )
+
+    const output = mockConsoleLog.mock.calls.map((call) => call[0]).join('\n')
+    const parsed = JSON.parse(output)
+    expect(parsed.changes[0].labels).toBeUndefined()
+  })
+
   test('should handle no changes gracefully', async () => {
     server.use(
       http.get('*/a/changes/', () => {
