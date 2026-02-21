@@ -215,7 +215,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
       const listChanges = (query = 'is:open') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
-          const url = `${credentials.host}/a/changes/?q=${encodeURIComponent(query)}&o=LABELS&o=DETAILED_LABELS&o=DETAILED_ACCOUNTS&o=SUBMITTABLE`
+          const url = `${credentials.host}/a/changes/?q=${encodeURIComponent(query)}&o=LABELS&o=DETAILED_LABELS&o=DETAILED_ACCOUNTS&o=SUBMITTABLE&o=CURRENT_REVISION`
           return yield* makeRequest(url, authHeader, 'GET', undefined, Schema.Array(ChangeInfo))
         })
 

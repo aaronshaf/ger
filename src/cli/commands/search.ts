@@ -103,13 +103,51 @@ export const searchCommand = (
         changes: groupedChanges.flatMap(({ project, changes: projectChanges }) =>
           projectChanges.map((change) => ({
             number: change._number,
+            id: change.id,
+            change_id: change.change_id,
             subject: change.subject,
             status: change.status,
             project,
             branch: change.branch,
             owner: change.owner?.name ?? 'Unknown',
+            ...(change.owner?._account_id !== undefined
+              ? { owner_account_id: change.owner._account_id }
+              : {}),
             ...(change.owner?.email ? { owner_email: change.owner.email } : {}),
+            ...(change.owner?.username ? { owner_username: change.owner.username } : {}),
+            ...(change.created ? { created: change.created } : {}),
             ...(change.updated ? { updated: change.updated } : {}),
+            ...(change.insertions !== undefined ? { insertions: change.insertions } : {}),
+            ...(change.deletions !== undefined ? { deletions: change.deletions } : {}),
+            ...(change.current_revision ? { current_revision: change.current_revision } : {}),
+            ...(change.submittable !== undefined ? { submittable: change.submittable } : {}),
+            ...(change.work_in_progress !== undefined
+              ? { work_in_progress: change.work_in_progress }
+              : {}),
+            ...(change.topic ? { topic: change.topic } : {}),
+            ...(change.labels && Object.keys(change.labels).length > 0
+              ? { labels: change.labels }
+              : {}),
+            ...(change.reviewers?.REVIEWER && change.reviewers.REVIEWER.length > 0
+              ? {
+                  reviewers: change.reviewers.REVIEWER.map((r) => ({
+                    ...(r._account_id !== undefined ? { account_id: r._account_id } : {}),
+                    ...(r.name ? { name: r.name } : {}),
+                    ...(r.email ? { email: r.email } : {}),
+                    ...(r.username ? { username: r.username } : {}),
+                  })),
+                }
+              : {}),
+            ...(change.reviewers?.CC && change.reviewers.CC.length > 0
+              ? {
+                  cc: change.reviewers.CC.map((r) => ({
+                    ...(r._account_id !== undefined ? { account_id: r._account_id } : {}),
+                    ...(r.name ? { name: r.name } : {}),
+                    ...(r.email ? { email: r.email } : {}),
+                    ...(r.username ? { username: r.username } : {}),
+                  })),
+                }
+              : {}),
           })),
         ),
       }
