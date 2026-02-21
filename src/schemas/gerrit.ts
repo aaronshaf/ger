@@ -78,6 +78,19 @@ const ChangeReviewerAccountInfo: Schema.Schema<ChangeReviewerAccount> = Schema.S
 type ChangeReviewerMap = Partial<
   Record<'REVIEWER' | 'CC' | 'REMOVED', ReadonlyArray<ChangeReviewerAccount>>
 >
+// Account/User schema (reusable for groups and reviewers)
+export const AccountInfo: Schema.Schema<{
+  readonly _account_id: number
+  readonly name?: string
+  readonly email?: string
+  readonly username?: string
+}> = Schema.Struct({
+  _account_id: Schema.Number,
+  name: Schema.optional(Schema.String),
+  email: Schema.optional(Schema.String),
+  username: Schema.optional(Schema.String),
+})
+export type AccountInfo = Schema.Schema.Type<typeof AccountInfo>
 
 export const ChangeInfo: Schema.Schema<{
   readonly id: string
@@ -145,51 +158,36 @@ export const ChangeInfo: Schema.Schema<{
   insertions: Schema.optional(Schema.Number),
   deletions: Schema.optional(Schema.Number),
   _number: Schema.Number,
-  owner: Schema.optional(
-    Schema.Struct({
-      _account_id: Schema.Number,
-      name: Schema.optional(Schema.String),
-      email: Schema.optional(Schema.String),
-      username: Schema.optional(Schema.String),
-    }),
-  ),
+  owner: Schema.optional(AccountInfo),
   labels: Schema.optional(
     Schema.Record({
       key: Schema.String,
       value: Schema.Struct({
-        approved: Schema.optional(
-          Schema.Struct({
-            _account_id: Schema.Number,
-            name: Schema.optional(Schema.String),
-            email: Schema.optional(Schema.String),
-            username: Schema.optional(Schema.String),
-          }),
-        ),
-        rejected: Schema.optional(
-          Schema.Struct({
-            _account_id: Schema.Number,
-            name: Schema.optional(Schema.String),
-            email: Schema.optional(Schema.String),
-            username: Schema.optional(Schema.String),
-          }),
-        ),
-        recommended: Schema.optional(
-          Schema.Struct({
-            _account_id: Schema.Number,
-            name: Schema.optional(Schema.String),
-            email: Schema.optional(Schema.String),
-            username: Schema.optional(Schema.String),
-          }),
-        ),
-        disliked: Schema.optional(
-          Schema.Struct({
-            _account_id: Schema.Number,
-            name: Schema.optional(Schema.String),
-            email: Schema.optional(Schema.String),
-            username: Schema.optional(Schema.String),
-          }),
-        ),
+        approved: Schema.optional(AccountInfo),
+        rejected: Schema.optional(AccountInfo),
+        recommended: Schema.optional(AccountInfo),
+        disliked: Schema.optional(AccountInfo),
         value: Schema.optional(Schema.Number),
+        default_value: Schema.optional(Schema.Number),
+        blocking: Schema.optional(Schema.Boolean),
+        optional: Schema.optional(Schema.Boolean),
+        values: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+        all: Schema.optional(
+          Schema.Array(
+            Schema.Struct({
+              _account_id: Schema.optional(Schema.Number),
+              name: Schema.optional(Schema.String),
+              email: Schema.optional(Schema.String),
+              username: Schema.optional(Schema.String),
+              value: Schema.optional(Schema.Number),
+              permitted_voting_range: Schema.optional(
+                Schema.Struct({ min: Schema.Number, max: Schema.Number }),
+              ),
+              date: Schema.optional(Schema.String),
+              tag: Schema.optional(Schema.String),
+            }),
+          ),
+        ),
       }),
     }),
   ),
@@ -604,20 +602,6 @@ export const GerritError: Schema.Schema<{
   status: Schema.optional(Schema.Number),
 })
 export type GerritError = Schema.Schema.Type<typeof GerritError>
-
-// Account/User schema (reusable for groups and reviewers)
-export const AccountInfo: Schema.Schema<{
-  readonly _account_id: number
-  readonly name?: string
-  readonly email?: string
-  readonly username?: string
-}> = Schema.Struct({
-  _account_id: Schema.Number,
-  name: Schema.optional(Schema.String),
-  email: Schema.optional(Schema.String),
-  username: Schema.optional(Schema.String),
-})
-export type AccountInfo = Schema.Schema.Type<typeof AccountInfo>
 
 // Groups schemas
 export const GroupInfo: Schema.Schema<{
