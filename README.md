@@ -18,6 +18,14 @@ curl -fsSL https://bun.sh/install | bash
 bun install -g @aaronshaf/ger
 ```
 
+## Upgrading
+
+To upgrade ger to the latest version:
+
+```bash
+bun update -g @aaronshaf/ger
+```
+
 ## Getting Started
 
 ```bash
