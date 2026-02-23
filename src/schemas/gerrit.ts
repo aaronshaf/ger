@@ -19,8 +19,34 @@ export const GerritCredentials: Schema.Schema<{
   ),
 })
 export type GerritCredentials = Schema.Schema.Type<typeof GerritCredentials>
+export const FileInfo: Schema.Schema<{
+  readonly status?: 'A' | 'D' | 'R' | 'C' | 'M'
+  readonly lines_inserted?: number
+  readonly lines_deleted?: number
+  readonly size?: number
+  readonly size_delta?: number
+  readonly old_path?: string
+  readonly binary?: boolean
+}> = Schema.Struct({
+  status: Schema.optional(Schema.Literal('A', 'D', 'R', 'C', 'M')), // Added, Deleted, Renamed, Copied, Modified
+  lines_inserted: Schema.optional(Schema.Number),
+  lines_deleted: Schema.optional(Schema.Number),
+  size_delta: Schema.optional(Schema.Number),
+  size: Schema.optional(Schema.Number),
+  old_path: Schema.optional(Schema.String),
+  binary: Schema.optional(Schema.Boolean),
+})
+export type FileInfo = Schema.Schema.Type<typeof FileInfo>
 
-export interface RevisionInfoType {
+type PersonDate = { readonly name: string; readonly email: string; readonly date: string }
+type ChangeMessage = {
+  readonly id: string
+  readonly message: string
+  readonly date: string
+  readonly _revision_number?: number
+  readonly tag?: string
+}
+type RevisionShape = {
   readonly kind?: string
   readonly _number: number
   readonly created: string
@@ -28,39 +54,21 @@ export interface RevisionInfoType {
     readonly _account_id: number
     readonly name?: string
     readonly email?: string
+    readonly username?: string
   }
   readonly ref: string
   readonly fetch?: Record<string, unknown>
+  readonly description?: string
   readonly commit?: {
     readonly commit: string
-    readonly parents: ReadonlyArray<{
-      readonly commit: string
-      readonly subject: string
-    }>
-    readonly author: {
-      readonly name: string
-      readonly email: string
-      readonly date: string
-    }
-    readonly committer: {
-      readonly name: string
-      readonly email: string
-      readonly date: string
-    }
+    readonly parents: ReadonlyArray<{ readonly commit: string; readonly subject: string }>
+    readonly author: PersonDate
+    readonly committer: PersonDate
     readonly subject: string
     readonly message: string
   }
-  readonly files?: Record<
-    string,
-    {
-      readonly status?: 'A' | 'D' | 'R' | 'C' | 'M'
-      readonly lines_inserted?: number
-      readonly lines_deleted?: number
-      readonly size?: number
-      readonly size_delta?: number
-      readonly old_path?: string
-    }
-  >
+  readonly files?: Record<string, FileInfo>
+  readonly actions?: Record<string, unknown>
 }
 
 type ChangeReviewerAccount = {
@@ -68,12 +76,16 @@ type ChangeReviewerAccount = {
   readonly name?: string
   readonly email?: string
   readonly username?: string
+  readonly display_name?: string
+  readonly tags?: ReadonlyArray<string>
 }
 const ChangeReviewerAccountInfo: Schema.Schema<ChangeReviewerAccount> = Schema.Struct({
   _account_id: Schema.optional(Schema.Number),
   name: Schema.optional(Schema.String),
   email: Schema.optional(Schema.String),
   username: Schema.optional(Schema.String),
+  display_name: Schema.optional(Schema.String),
+  tags: Schema.optional(Schema.Array(Schema.String)),
 })
 type ChangeReviewerMap = Partial<
   Record<'REVIEWER' | 'CC' | 'REMOVED', ReadonlyArray<ChangeReviewerAccount>>
@@ -84,11 +96,19 @@ export const AccountInfo: Schema.Schema<{
   readonly name?: string
   readonly email?: string
   readonly username?: string
+  readonly display_name?: string
+  readonly tags?: ReadonlyArray<string>
+  readonly inactive?: boolean
+  readonly status?: string
 }> = Schema.Struct({
   _account_id: Schema.Number,
   name: Schema.optional(Schema.String),
   email: Schema.optional(Schema.String),
   username: Schema.optional(Schema.String),
+  display_name: Schema.optional(Schema.String),
+  tags: Schema.optional(Schema.Array(Schema.String)),
+  inactive: Schema.optional(Schema.Boolean),
+  status: Schema.optional(Schema.String),
 })
 export type AccountInfo = Schema.Schema.Type<typeof AccountInfo>
 
@@ -101,51 +121,35 @@ export const ChangeInfo: Schema.Schema<{
   readonly status: 'NEW' | 'MERGED' | 'ABANDONED' | 'DRAFT'
   readonly created?: string
   readonly updated?: string
+  readonly submitted?: string
   readonly insertions?: number
   readonly deletions?: number
   readonly _number: number
-  readonly owner?: {
-    readonly _account_id: number
-    readonly name?: string
-    readonly email?: string
-    readonly username?: string
-  }
+  readonly owner?: AccountInfo
   readonly labels?: Record<
     string,
     {
-      readonly approved?: {
-        readonly _account_id: number
-        readonly name?: string
-        readonly email?: string
-        readonly username?: string
-      }
-      readonly rejected?: {
-        readonly _account_id: number
-        readonly name?: string
-        readonly email?: string
-        readonly username?: string
-      }
-      readonly recommended?: {
-        readonly _account_id: number
-        readonly name?: string
-        readonly email?: string
-        readonly username?: string
-      }
-      readonly disliked?: {
-        readonly _account_id: number
-        readonly name?: string
-        readonly email?: string
-        readonly username?: string
-      }
+      readonly approved?: AccountInfo
+      readonly rejected?: AccountInfo
+      readonly recommended?: AccountInfo
+      readonly disliked?: AccountInfo
       readonly value?: number
     }
   >
   readonly submittable?: boolean
   readonly work_in_progress?: boolean
+  readonly is_private?: boolean
   readonly current_revision?: string
-  readonly revisions?: Record<string, RevisionInfoType>
+  readonly revisions?: Record<string, RevisionShape>
   readonly topic?: string
+  readonly hashtags?: ReadonlyArray<string>
   readonly reviewers?: ChangeReviewerMap
+  readonly mergeable?: boolean
+  readonly unresolved_comment_count?: number
+  readonly total_comment_count?: number
+  readonly attention_set?: Record<string, unknown>
+  readonly submit_type?: string
+  readonly messages?: ReadonlyArray<ChangeMessage>
 }> = Schema.Struct({
   id: Schema.String,
   project: Schema.String,
@@ -155,6 +159,7 @@ export const ChangeInfo: Schema.Schema<{
   status: Schema.Literal('NEW', 'MERGED', 'ABANDONED', 'DRAFT'),
   created: Schema.optional(Schema.String),
   updated: Schema.optional(Schema.String),
+  submitted: Schema.optional(Schema.String),
   insertions: Schema.optional(Schema.Number),
   deletions: Schema.optional(Schema.Number),
   _number: Schema.Number,
@@ -171,6 +176,7 @@ export const ChangeInfo: Schema.Schema<{
         default_value: Schema.optional(Schema.Number),
         blocking: Schema.optional(Schema.Boolean),
         optional: Schema.optional(Schema.Boolean),
+        description: Schema.optional(Schema.String),
         values: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
         all: Schema.optional(
           Schema.Array(
@@ -180,6 +186,7 @@ export const ChangeInfo: Schema.Schema<{
               email: Schema.optional(Schema.String),
               username: Schema.optional(Schema.String),
               value: Schema.optional(Schema.Number),
+              post_submit: Schema.optional(Schema.Boolean),
               permitted_voting_range: Schema.optional(
                 Schema.Struct({ min: Schema.Number, max: Schema.Number }),
               ),
@@ -193,15 +200,33 @@ export const ChangeInfo: Schema.Schema<{
   ),
   submittable: Schema.optional(Schema.Boolean),
   work_in_progress: Schema.optional(Schema.Boolean),
+  is_private: Schema.optional(Schema.Boolean),
   current_revision: Schema.optional(Schema.String),
   revisions: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })),
   topic: Schema.optional(Schema.String),
+  hashtags: Schema.optional(Schema.Array(Schema.String)),
   reviewers: Schema.optional(
     Schema.Struct({
       REVIEWER: Schema.optional(Schema.Array(ChangeReviewerAccountInfo)),
       CC: Schema.optional(Schema.Array(ChangeReviewerAccountInfo)),
       REMOVED: Schema.optional(Schema.Array(ChangeReviewerAccountInfo)),
     }),
+  ),
+  mergeable: Schema.optional(Schema.Boolean),
+  unresolved_comment_count: Schema.optional(Schema.Number),
+  total_comment_count: Schema.optional(Schema.Number),
+  attention_set: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })),
+  submit_type: Schema.optional(Schema.String),
+  messages: Schema.optional(
+    Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        message: Schema.String,
+        date: Schema.String,
+        _revision_number: Schema.optional(Schema.Number),
+        tag: Schema.optional(Schema.String),
+      }),
+    ),
   ),
 })
 export type ChangeInfo = Schema.Schema.Type<typeof ChangeInfo>
@@ -221,6 +246,8 @@ export type CommentInput = Schema.Schema.Type<typeof CommentInput>
 export const CommentInfo: Schema.Schema<{
   readonly id: string
   readonly path?: string
+  readonly patch_set?: number
+  readonly side?: 'PARENT' | 'REVISION'
   readonly line?: number
   readonly range?: {
     readonly start_line: number
@@ -229,17 +256,18 @@ export const CommentInfo: Schema.Schema<{
     readonly end_character?: number
   }
   readonly message: string
-  readonly author?: {
-    readonly name?: string
-    readonly email?: string
-    readonly _account_id?: number
-  }
+  readonly author?: ChangeReviewerAccount
   readonly updated?: string
   readonly unresolved?: boolean
   readonly in_reply_to?: string
+  readonly tag?: string
+  readonly change_message_id?: string
+  readonly commit_id?: string
 }> = Schema.Struct({
   id: Schema.String,
   path: Schema.optional(Schema.String),
+  patch_set: Schema.optional(Schema.Number),
+  side: Schema.optional(Schema.Literal('PARENT', 'REVISION')),
   line: Schema.optional(Schema.Number),
   range: Schema.optional(
     Schema.Struct({
@@ -250,40 +278,29 @@ export const CommentInfo: Schema.Schema<{
     }),
   ),
   message: Schema.String,
-  author: Schema.optional(
-    Schema.Struct({
-      name: Schema.optional(Schema.String),
-      email: Schema.optional(Schema.String),
-      _account_id: Schema.optional(Schema.Number),
-    }),
-  ),
+  author: Schema.optional(ChangeReviewerAccountInfo),
   updated: Schema.optional(Schema.String),
   unresolved: Schema.optional(Schema.Boolean),
   in_reply_to: Schema.optional(Schema.String),
+  tag: Schema.optional(Schema.String),
+  change_message_id: Schema.optional(Schema.String),
+  commit_id: Schema.optional(Schema.String),
 })
 export type CommentInfo = Schema.Schema.Type<typeof CommentInfo>
 
 export const MessageInfo: Schema.Schema<{
   readonly id: string
   readonly message: string
-  readonly author?: {
-    readonly _account_id: number
-    readonly name?: string
-    readonly email?: string
-  }
+  readonly author?: AccountInfo
+  readonly real_author?: AccountInfo
   readonly date: string
   readonly _revision_number?: number
   readonly tag?: string
 }> = Schema.Struct({
   id: Schema.String,
   message: Schema.String,
-  author: Schema.optional(
-    Schema.Struct({
-      _account_id: Schema.Number,
-      name: Schema.optional(Schema.String),
-      email: Schema.optional(Schema.String),
-    }),
-  ),
+  author: Schema.optional(AccountInfo),
+  real_author: Schema.optional(AccountInfo),
   date: Schema.String,
   _revision_number: Schema.optional(Schema.Number),
   tag: Schema.optional(Schema.String),
@@ -341,35 +358,35 @@ export const ProjectInfo: Schema.Schema<{
   readonly id: string
   readonly name: string
   readonly parent?: string
+  readonly description?: string
   readonly state?: 'ACTIVE' | 'READ_ONLY' | 'HIDDEN'
 }> = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   parent: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
   state: Schema.optional(Schema.Literal('ACTIVE', 'READ_ONLY', 'HIDDEN')),
 })
 export type ProjectInfo = Schema.Schema.Type<typeof ProjectInfo>
 
-export const FileInfo: Schema.Schema<{
-  readonly status?: 'A' | 'D' | 'R' | 'C' | 'M'
-  readonly lines_inserted?: number
-  readonly lines_deleted?: number
-  readonly size?: number
-  readonly size_delta?: number
-  readonly old_path?: string
+export const DiffFileMeta: Schema.Schema<{
+  readonly name: string
+  readonly content_type: string
+  readonly lines?: number
 }> = Schema.Struct({
-  status: Schema.optional(Schema.Literal('A', 'D', 'R', 'C', 'M')), // Added, Deleted, Renamed, Copied, Modified
-  lines_inserted: Schema.optional(Schema.Number),
-  lines_deleted: Schema.optional(Schema.Number),
-  size_delta: Schema.optional(Schema.Number),
-  size: Schema.optional(Schema.Number),
-  old_path: Schema.optional(Schema.String),
+  name: Schema.String,
+  content_type: Schema.String,
+  lines: Schema.optional(Schema.Number),
 })
-export type FileInfo = Schema.Schema.Type<typeof FileInfo>
+export type DiffFileMeta = Schema.Schema.Type<typeof DiffFileMeta>
 
 export const FileDiffContent: Schema.Schema<{
-  readonly a?: string
-  readonly b?: string
+  readonly meta_a?: DiffFileMeta
+  readonly meta_b?: DiffFileMeta
+  readonly binary?: boolean
+  readonly change_type?: 'ADDED' | 'MODIFIED' | 'DELETED' | 'RENAMED' | 'COPIED'
+  readonly diff_header?: ReadonlyArray<string>
+  readonly intraline_status?: 'OK' | 'TIMEOUT' | 'FAILURE'
   readonly content: ReadonlyArray<{
     readonly a?: ReadonlyArray<string>
     readonly b?: ReadonlyArray<string>
@@ -382,11 +399,13 @@ export const FileDiffContent: Schema.Schema<{
     readonly due_to_rebase?: boolean
     readonly skip?: number
   }>
-  readonly change_type?: 'ADDED' | 'MODIFIED' | 'DELETED' | 'RENAMED' | 'COPIED'
-  readonly diff_header?: ReadonlyArray<string>
 }> = Schema.Struct({
-  a: Schema.optional(Schema.String), // Old file content path
-  b: Schema.optional(Schema.String), // New file content path
+  meta_a: Schema.optional(DiffFileMeta),
+  meta_b: Schema.optional(DiffFileMeta),
+  binary: Schema.optional(Schema.Boolean),
+  change_type: Schema.optional(Schema.Literal('ADDED', 'MODIFIED', 'DELETED', 'RENAMED', 'COPIED')),
+  diff_header: Schema.optional(Schema.Array(Schema.String)),
+  intraline_status: Schema.optional(Schema.Literal('OK', 'TIMEOUT', 'FAILURE')),
   content: Schema.Array(
     Schema.Struct({
       a: Schema.optional(Schema.Array(Schema.String)), // Lines from old file
@@ -405,8 +424,6 @@ export const FileDiffContent: Schema.Schema<{
       skip: Schema.optional(Schema.Number),
     }),
   ),
-  change_type: Schema.optional(Schema.Literal('ADDED', 'MODIFIED', 'DELETED', 'RENAMED', 'COPIED')),
-  diff_header: Schema.optional(Schema.Array(Schema.String)),
 })
 export type FileDiffContent = Schema.Schema.Type<typeof FileDiffContent>
 
@@ -418,25 +435,16 @@ export const RevisionInfo: Schema.Schema<{
     readonly _account_id: number
     readonly name?: string
     readonly email?: string
+    readonly username?: string
   }
   readonly ref: string
   readonly fetch?: Record<string, unknown>
+  readonly description?: string
   readonly commit?: {
     readonly commit: string
-    readonly parents: ReadonlyArray<{
-      readonly commit: string
-      readonly subject: string
-    }>
-    readonly author: {
-      readonly name: string
-      readonly email: string
-      readonly date: string
-    }
-    readonly committer: {
-      readonly name: string
-      readonly email: string
-      readonly date: string
-    }
+    readonly parents: ReadonlyArray<{ readonly commit: string; readonly subject: string }>
+    readonly author: PersonDate
+    readonly committer: PersonDate
     readonly subject: string
     readonly message: string
   }
@@ -449,8 +457,10 @@ export const RevisionInfo: Schema.Schema<{
       readonly size?: number
       readonly size_delta?: number
       readonly old_path?: string
+      readonly binary?: boolean
     }
   >
+  readonly actions?: Record<string, unknown>
 }> = Schema.Struct({
   kind: Schema.optional(Schema.String),
   _number: Schema.Number,
@@ -459,9 +469,11 @@ export const RevisionInfo: Schema.Schema<{
     _account_id: Schema.Number,
     name: Schema.optional(Schema.String),
     email: Schema.optional(Schema.String),
+    username: Schema.optional(Schema.String),
   }),
   ref: Schema.String,
   fetch: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })),
+  description: Schema.optional(Schema.String),
   commit: Schema.optional(
     Schema.Struct({
       commit: Schema.String,
@@ -486,8 +498,11 @@ export const RevisionInfo: Schema.Schema<{
     }),
   ),
   files: Schema.optional(Schema.Record({ key: Schema.String, value: FileInfo })),
+  actions: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Any })),
 })
 export type RevisionInfo = Schema.Schema.Type<typeof RevisionInfo>
+// Backwards-compatible alias used by mock-generator and other consumers
+export type RevisionInfoType = RevisionShape
 
 // Diff output format options
 export const DiffFormat: Schema.Schema<'unified' | 'json' | 'files'> = Schema.Literal(
@@ -550,6 +565,7 @@ const ReviewerAccountInfo = Schema.Struct({
   _account_id: Schema.Number,
   name: Schema.optional(Schema.String),
   email: Schema.optional(Schema.String),
+  username: Schema.optional(Schema.String),
 })
 
 export const ReviewerResult: Schema.Schema<{
@@ -558,11 +574,13 @@ export const ReviewerResult: Schema.Schema<{
     readonly _account_id: number
     readonly name?: string
     readonly email?: string
+    readonly username?: string
   }>
   readonly ccs?: ReadonlyArray<{
     readonly _account_id: number
     readonly name?: string
     readonly email?: string
+    readonly username?: string
   }>
   readonly error?: string
   readonly confirm?: boolean
@@ -645,12 +663,7 @@ export const GroupDetailInfo: Schema.Schema<{
   readonly owner?: string
   readonly owner_id?: string
   readonly created_on?: string
-  readonly members?: ReadonlyArray<{
-    readonly _account_id: number
-    readonly name?: string
-    readonly email?: string
-    readonly username?: string
-  }>
+  readonly members?: ReadonlyArray<AccountInfo>
   readonly includes?: ReadonlyArray<{
     readonly id: string
     readonly name?: string

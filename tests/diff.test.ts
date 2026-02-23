@@ -76,9 +76,11 @@ describe('diff command', () => {
       const mockDiff = {
         meta_a: {
           name: 'src/utils.js',
+          content_type: 'text/plain',
         },
         meta_b: {
           name: 'src/utils.js',
+          content_type: 'text/plain',
         },
         content: [
           {
