@@ -48,6 +48,43 @@ const program = new Command()
 
 program.name('ger').description('LLM-centric Gerrit CLI tool').version(getVersion())
 
+program.addHelpText(
+  'after',
+  `
+CHANGE-ID FORMATS
+  Accepts numeric change numbers (12345) or full Change-IDs (I1234abc...).
+  Many commands auto-detect from HEAD commit's Change-Id footer when the
+  argument is omitted.
+
+OUTPUT FORMATS
+  --json    Structured JSON output for programmatic consumption
+  --xml     XML with CDATA-wrapped content, optimized for LLM consumption
+  (default) Plain text for human reading
+  Most commands support both --json and --xml.
+
+PIPING / STDIN
+  comment           Reads message from stdin if no -m flag is provided
+  comment --batch   Reads a JSON array from stdin for bulk commenting
+
+AUTO-DETECTION
+  These commands auto-detect the change from HEAD's Change-Id footer when
+  the change-id argument is omitted:
+    show, build-status, topic, rebase, extract-url, diff, comments, vote
+
+COMMON LLM WORKFLOWS
+  Review a change:    ger show <id> → ger diff <id> → ger comments <id>
+  Post a review:      ger comment <id> -m "..." → ger vote <id> <label> <score>
+  Manage changes:     ger push, ger checkout <id>, ger abandon <id>, ger submit <id>
+  Check CI:           ger build-status <id> --exit-status
+
+EXIT CODES
+  build-status --exit-status returns non-zero on build failure (useful for scripting).
+
+SUBCOMMAND HELP
+  Run ger <command> --help for detailed usage and examples.
+`,
+)
+
 registerCommands(program)
 
 program.parse(process.argv)
