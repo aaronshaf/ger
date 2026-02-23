@@ -384,9 +384,9 @@ export const FileDiffContent: Schema.Schema<{
   readonly meta_a?: DiffFileMeta
   readonly meta_b?: DiffFileMeta
   readonly binary?: boolean
-  readonly change_type?: 'ADDED' | 'MODIFIED' | 'DELETED' | 'RENAMED' | 'COPIED'
+  readonly change_type?: 'ADDED' | 'MODIFIED' | 'DELETED' | 'RENAMED' | 'COPIED' | 'REWRITE'
   readonly diff_header?: ReadonlyArray<string>
-  readonly intraline_status?: 'OK' | 'TIMEOUT' | 'FAILURE'
+  readonly intraline_status?: 'OK' | 'TIMEOUT' | 'ERROR'
   readonly content: ReadonlyArray<{
     readonly a?: ReadonlyArray<string>
     readonly b?: ReadonlyArray<string>
@@ -403,9 +403,11 @@ export const FileDiffContent: Schema.Schema<{
   meta_a: Schema.optional(DiffFileMeta),
   meta_b: Schema.optional(DiffFileMeta),
   binary: Schema.optional(Schema.Boolean),
-  change_type: Schema.optional(Schema.Literal('ADDED', 'MODIFIED', 'DELETED', 'RENAMED', 'COPIED')),
+  change_type: Schema.optional(
+    Schema.Literal('ADDED', 'MODIFIED', 'DELETED', 'RENAMED', 'COPIED', 'REWRITE'),
+  ),
   diff_header: Schema.optional(Schema.Array(Schema.String)),
-  intraline_status: Schema.optional(Schema.Literal('OK', 'TIMEOUT', 'FAILURE')),
+  intraline_status: Schema.optional(Schema.Literal('OK', 'TIMEOUT', 'ERROR')),
   content: Schema.Array(
     Schema.Struct({
       a: Schema.optional(Schema.Array(Schema.String)), // Lines from old file
