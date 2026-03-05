@@ -5,8 +5,7 @@ import { ConfigServiceLive } from '@/services/config'
 import { ReviewStrategyServiceLive } from '@/services/review-strategy'
 import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { CommitHookServiceLive } from '@/services/commit-hook'
-import { abandonCommand } from './commands/abandon'
-import { restoreCommand } from './commands/restore'
+import { registerStateCommands } from './register-state-commands'
 import { rebaseCommand } from './commands/rebase'
 import { submitCommand } from './commands/submit'
 import { topicCommand, TOPIC_HELP_TEXT } from './commands/topic'
@@ -240,43 +239,8 @@ export function registerCommands(program: Command): void {
       )
     })
 
-  // abandon command
-  program
-    .command('abandon [change-id]')
-    .description(
-      'Abandon a change (interactive mode if no change-id provided; accepts change number or Change-ID)',
-    )
-    .option('-m, --message <message>', 'Abandon message')
-    .option('--xml', 'XML output for LLM consumption')
-    .option('--json', 'JSON output for programmatic consumption')
-    .action(async (changeId, options) => {
-      await executeEffect(
-        abandonCommand(changeId, options).pipe(
-          Effect.provide(GerritApiServiceLive),
-          Effect.provide(ConfigServiceLive),
-        ),
-        options,
-        'abandon_result',
-      )
-    })
-
-  // restore command
-  program
-    .command('restore <change-id>')
-    .description('Restore an abandoned change (accepts change number or Change-ID)')
-    .option('-m, --message <message>', 'Restoration message')
-    .option('--xml', 'XML output for LLM consumption')
-    .option('--json', 'JSON output for programmatic consumption')
-    .action(async (changeId, options) => {
-      await executeEffect(
-        restoreCommand(changeId, options).pipe(
-          Effect.provide(GerritApiServiceLive),
-          Effect.provide(ConfigServiceLive),
-        ),
-        options,
-        'restore_result',
-      )
-    })
+  // abandon / restore / set-ready / set-wip commands
+  registerStateCommands(program)
 
   // rebase command
   program

@@ -19,6 +19,7 @@ import {
   AccountInfo,
 } from '@/schemas/gerrit'
 import { filterMeaningfulMessages } from '@/utils/message-filters'
+import { convertToUnifiedDiff } from '@/utils/diff-formatters'
 import { ConfigService } from '@/services/config'
 import { normalizeChangeIdentifier } from '@/utils/change-id'
 
@@ -93,6 +94,8 @@ export interface GerritApiServiceImpl {
   readonly getTopic: (changeId: string) => Effect.Effect<string | null, ApiError>
   readonly setTopic: (changeId: string, topic: string) => Effect.Effect<string, ApiError>
   readonly deleteTopic: (changeId: string) => Effect.Effect<void, ApiError>
+  readonly setReady: (changeId: string, message?: string) => Effect.Effect<void, ApiError>
+  readonly setWip: (changeId: string, message?: string) => Effect.Effect<void, ApiError>
 }
 
 export const GerritApiService: Context.Tag<GerritApiServiceImpl, GerritApiServiceImpl> =
@@ -455,39 +458,6 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           return yield* getPatch(changeId, revisionId)
         })
 
-      const convertToUnifiedDiff = (diff: FileDiffContent, filePath: string): string => {
-        const lines: string[] = []
-
-        if (diff.diff_header) {
-          lines.push(...diff.diff_header)
-        } else {
-          lines.push(`--- a/${filePath}`)
-          lines.push(`+++ b/${filePath}`)
-        }
-
-        for (const section of diff.content) {
-          if (section.ab) {
-            for (const line of section.ab) {
-              lines.push(` ${line}`)
-            }
-          }
-
-          if (section.a) {
-            for (const line of section.a) {
-              lines.push(`-${line}`)
-            }
-          }
-
-          if (section.b) {
-            for (const line of section.b) {
-              lines.push(`+${line}`)
-            }
-          }
-        }
-
-        return lines.join('\n')
-      }
-
       const getComments = (changeId: string, revisionId = 'current') =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
@@ -667,6 +637,24 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           yield* makeRequest(getTopicUrl(credentials.host, normalized), authHeader, 'DELETE')
         })
 
+      const setReady = (changeId: string, message?: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/ready`
+          const body = message ? { message } : {}
+          yield* makeRequest(url, authHeader, 'POST', body)
+        })
+
+      const setWip = (changeId: string, message?: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/wip`
+          const body = message ? { message } : {}
+          yield* makeRequest(url, authHeader, 'POST', body)
+        })
+
       return {
         getChange,
         listChanges,
@@ -694,6 +682,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         getTopic,
         setTopic,
         deleteTopic,
+        setReady,
+        setWip,
       }
     }),
   )

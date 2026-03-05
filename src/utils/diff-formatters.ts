@@ -1,4 +1,5 @@
 import { colors } from './formatters'
+import type { FileDiffContent } from '@/schemas/gerrit'
 
 interface DiffStats {
   additions: number
@@ -138,4 +139,35 @@ export const extractDiffStats = (diffContent: string): DiffStats => {
   }
 
   return { additions, deletions, files }
+}
+
+export const convertToUnifiedDiff = (diff: FileDiffContent, filePath: string): string => {
+  const lines: string[] = []
+
+  if (diff.diff_header) {
+    lines.push(...diff.diff_header)
+  } else {
+    lines.push(`--- a/${filePath}`)
+    lines.push(`+++ b/${filePath}`)
+  }
+
+  for (const section of diff.content) {
+    if (section.ab) {
+      for (const line of section.ab) {
+        lines.push(` ${line}`)
+      }
+    }
+    if (section.a) {
+      for (const line of section.a) {
+        lines.push(`-${line}`)
+      }
+    }
+    if (section.b) {
+      for (const line of section.b) {
+        lines.push(`+${line}`)
+      }
+    }
+  }
+
+  return lines.join('\n')
 }
