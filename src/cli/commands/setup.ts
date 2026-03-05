@@ -260,7 +260,6 @@ const setupEffect = (configService: ConfigServiceImpl) =>
     Effect.tap(() => Console.log('You can now use:')),
     Effect.tap(() => Console.log('  • "ger mine" to view your changes')),
     Effect.tap(() => Console.log('  • "ger show <change-id>" to view change details')),
-    Effect.tap(() => Console.log('  • "ger review <change-id>" to review with AI')),
     Effect.catchAll((error) =>
       pipe(
         Console.error(

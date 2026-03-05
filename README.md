@@ -93,9 +93,6 @@ ger rebase 12345
 ger submit 12345
 ger restore 12345
 
-# AI-powered code review (requires claude, llm, or opencode CLI)
-ger review 12345
-ger review 12345 --dry-run  # Preview without posting
 ```
 
 ## Commands
@@ -710,29 +707,6 @@ ger groups-members project-reviewers --xml
 - All group commands provide read-only access
 - Group IDs can be names, numeric IDs, or UUIDs
 - Use groups with `ger add-reviewer --group` to add entire teams as reviewers
-
-### AI-Powered Review
-
-The `ger review` command provides automated code review using AI tools (claude, llm, or opencode CLI).
-
-```bash
-# Full AI review with inline and overall comments
-ger review 12345
-
-# Preview what would be posted without actually posting
-ger review 12345 --dry-run
-
-# Show debug output including AI responses
-ger review 12345 --debug
-```
-
-The review command performs a two-stage review process:
-1. **Inline comments**: Specific code issues with line-by-line feedback
-2. **Overall review**: High-level assessment and recommendations
-
-Requirements:
-- One of these AI tools must be installed: `claude`, `llm`, or `opencode`
-- Gerrit credentials must be configured (`ger setup`)
 
 ## Claude Code Skill
 

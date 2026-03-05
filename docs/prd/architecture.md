@@ -6,16 +6,16 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                         CLI Layer                           │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐           │
-│  │  show   │ │ comment │ │  push   │ │ review  │  ...      │
+│  │  show   │ │ comment │ │  push   │ │  vote   │  ...      │
 │  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘           │
 └───────┼───────────┼───────────┼───────────┼─────────────────┘
         │           │           │           │
 ┌───────┴───────────┴───────────┴───────────┴─────────────────┐
 │                      Service Layer                          │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
-│  │ GerritApi    │ │ ConfigService│ │ ReviewStrategy│        │
-│  │ Service      │ │              │ │              │        │
-│  └──────────────┘ └──────────────┘ └──────────────┘        │
+│  ┌──────────────┐ ┌──────────────┐                         │
+│  │ GerritApi    │ │ ConfigService│                         │
+│  │ Service      │ │              │                         │
+│  └──────────────┘ └──────────────┘                         │
 └───────┬───────────────────────────────────────────────────────┘
         │
 ┌───────┴─────────────────────────────────────────────────────┐
@@ -46,7 +46,6 @@ src/
 │
 ├── services/              # Business logic services
 │   ├── config.ts          # Configuration management
-│   ├── review-strategy.ts # AI tool strategies
 │   ├── git-worktree.ts    # Git worktree operations
 │   └── commit-hook.ts     # Gerrit hook installation
 │
@@ -59,12 +58,7 @@ src/
 │   ├── git-commit.ts      # Git operations
 │   ├── formatters.ts      # Output formatting
 │   ├── shell-safety.ts    # XML/CDATA handling
-│   └── ... (diff, comment, review utils)
-│
-├── prompts/               # AI review prompts
-│   ├── default-review.md
-│   ├── system-inline-review.md
-│   └── system-overall-review.md
+│   └── ... (diff, comment utils)
 │
 └── i18n/                  # Internationalization (planned)
 
@@ -205,42 +199,6 @@ User: echo '...' | ger comment 12345
           │
           ▼
        Success/Error
-```
-
-## AI Integration Flow
-
-```
-User: ger review 12345
-         │
-         ▼
-┌─────────────────────┐
-│ Fetch change diff   │
-│ (API: GET /patch)   │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ Detect AI tool      │
-│ (claude/llm/etc)    │
-└─────────┬───────────┘
-          │
-          ▼
-┌─────────────────────┐     ┌─────────────────────┐
-│ Stage 1: Inline     │────►│ AI: Generate inline │
-│ comments            │     │ comments JSON       │
-└─────────┬───────────┘     └─────────────────────┘
-          │
-          ▼
-┌─────────────────────┐     ┌─────────────────────┐
-│ Stage 2: Overall    │────►│ AI: Generate        │
-│ review              │     │ summary             │
-└─────────┬───────────┘     └─────────────────────┘
-          │
-          ▼
-┌─────────────────────┐
-│ API: POST /review   │
-│ (all comments)      │
-└─────────────────────┘
 ```
 
 ## Configuration Architecture

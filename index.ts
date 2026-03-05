@@ -61,25 +61,6 @@ export {
   type ConfigErrorFields,
 } from './src/services/config'
 
-// ============================================================================
-// Review Strategy Service
-// ============================================================================
-
-export {
-  // Strategy types
-  type ReviewStrategy,
-  // Built-in strategies
-  claudeCliStrategy,
-  geminiCliStrategy,
-  openCodeCliStrategy,
-  // Service
-  ReviewStrategyService,
-  ReviewStrategyServiceLive,
-  type ReviewStrategyServiceImpl,
-  // Errors
-  ReviewStrategyError,
-  type ReviewStrategyErrorFields,
-} from './src/services/review-strategy'
 
 // ============================================================================
 // Git Worktree Service

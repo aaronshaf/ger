@@ -114,14 +114,6 @@ ger extract-url "build-summary-report" | tail -1   # Latest Jenkins URL
 ger extract-url "jenkins" --json | jq -r '.urls[-1]'
 ```
 
-### AI Review
-
-```bash
-ger review <change-id>              # AI-powered review (requires claude/gemini/opencode CLI)
-ger review <change-id> --tool claude
-ger review <change-id> --comment --yes  # Post review comments
-```
-
 ### Groups
 
 ```bash
@@ -177,12 +169,6 @@ ger show 12345                     # View change
 ger diff 12345                     # See code changes
 ger comment 12345 -m "LGTM"        # Add comment
 ger vote 12345 --code-review +2    # Approve
-```
-
-### Post AI review
-
-```bash
-ger review 12345 --comment --yes
 ```
 
 ### Check build and get failures

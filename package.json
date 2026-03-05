@@ -30,10 +30,6 @@
       "import": "./src/services/config.ts",
       "types": "./src/services/config.ts"
     },
-    "./services/review-strategy": {
-      "import": "./src/services/review-strategy.ts",
-      "types": "./src/services/review-strategy.ts"
-    },
     "./services/git-worktree": {
       "import": "./src/services/git-worktree.ts",
       "types": "./src/services/git-worktree.ts"
