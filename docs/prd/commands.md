@@ -121,6 +121,32 @@ ger restore <change-id>
 ger restore <change-id> -m "Needed after all"
 ```
 
+### set-ready
+
+Mark a WIP change as ready for review via the Gerrit REST API. Does not require a git push.
+
+```bash
+ger set-ready <change-id>
+ger set-ready <change-id> -m "Ready for another look"
+```
+
+| Option | Description |
+|--------|-------------|
+| `-m <message>` | Optional message to include with the status change |
+
+### set-wip
+
+Mark a change as work-in-progress via the Gerrit REST API. Does not require a git push.
+
+```bash
+ger set-wip <change-id>
+ger set-wip <change-id> -m "Still in progress"
+```
+
+| Option | Description |
+|--------|-------------|
+| `-m <message>` | Optional message to include with the status change |
+
 ### workspace
 
 View local git branch tracking information.

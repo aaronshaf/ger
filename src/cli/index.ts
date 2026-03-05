@@ -75,6 +75,7 @@ COMMON LLM WORKFLOWS
   Review a change:    ger show <id> → ger diff <id> → ger comments <id>
   Post a review:      ger comment <id> -m "..." → ger vote <id> <label> <score>
   Manage changes:     ger push, ger checkout <id>, ger abandon <id>, ger submit <id>
+  WIP toggle:         ger set-wip <id>, ger set-ready <id> [-m "message"]
   Check CI:           ger build-status <id> --exit-status
 
 EXIT CODES
