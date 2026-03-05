@@ -2,8 +2,6 @@ import type { Command } from 'commander'
 import { Effect } from 'effect'
 import { GerritApiServiceLive } from '@/api/gerrit'
 import { ConfigServiceLive } from '@/services/config'
-import { ReviewStrategyServiceLive } from '@/services/review-strategy'
-import { GitWorktreeServiceLive } from '@/services/git-worktree'
 import { CommitHookServiceLive } from '@/services/commit-hook'
 import { registerStateCommands } from './register-state-commands'
 import { rebaseCommand } from './commands/rebase'
@@ -22,7 +20,6 @@ import { installHookCommand } from './commands/install-hook'
 import { mineCommand } from './commands/mine'
 import { openCommand } from './commands/open'
 import { pushCommand, PUSH_HELP_TEXT } from './commands/push'
-import { reviewCommand } from './commands/review'
 import { searchCommand, SEARCH_HELP_TEXT } from './commands/search'
 import { setup } from './commands/setup'
 import { showCommand, SHOW_HELP_TEXT } from './commands/show'
@@ -597,66 +594,6 @@ Note:
         await Effect.runPromise(effect)
       } catch (error) {
         console.error('Error:', error instanceof Error ? error.message : String(error))
-        process.exit(1)
-      }
-    })
-
-  // review command
-  program
-    .command('review <change-id>')
-    .description(
-      'AI-powered code review that analyzes changes and optionally posts comments (accepts change number or Change-ID)',
-    )
-    .option('--comment', 'Post the review as comments (prompts for confirmation)')
-    .option('-y, --yes', 'Skip confirmation prompts when posting comments')
-    .option('--debug', 'Show debug output including AI responses')
-    .option('--prompt <file>', 'Path to custom review prompt file (e.g., ~/prompts/review.md)')
-    .option('--tool <tool>', 'Preferred AI tool (claude, gemini, opencode)')
-    .option('--system-prompt <prompt>', 'Custom system prompt for the AI')
-    .addHelpText(
-      'after',
-      `
-This command uses AI (claude CLI, gemini CLI, or opencode CLI) to review a Gerrit change.
-It performs a two-stage review process:
-1. Generates inline comments for specific code issues
-2. Generates an overall review comment
-By default, the review is only displayed in the terminal.
-Use --comment to post the review to Gerrit (with confirmation prompts).
-Use --comment --yes to post without confirmation.
-
-Requirements:
-  - One of these AI tools must be available: claude CLI, gemini CLI, or opencode CLI
-  - Gerrit credentials must be configured (run 'ger setup' first)
-
-Examples:
-  $ ger review 12345
-  $ ger review If5a3ae8cb5a107e187447802358417f311d0c4b1
-  $ ger review 12345 --comment
-  $ ger review 12345 --comment --yes
-  $ ger review 12345 --tool gemini
-  $ ger review 12345 --debug
-
-Note: Both change number (e.g., 12345) and Change-ID (e.g., If5a3ae8...) formats are accepted
-`,
-    )
-    .action(async (changeId, options) => {
-      try {
-        const effect = reviewCommand(changeId, {
-          comment: options.comment,
-          yes: options.yes,
-          debug: options.debug,
-          prompt: options.prompt,
-          tool: options.tool,
-          systemPrompt: options.systemPrompt,
-        }).pipe(
-          Effect.provide(ReviewStrategyServiceLive),
-          Effect.provide(GerritApiServiceLive),
-          Effect.provide(ConfigServiceLive),
-          Effect.provide(GitWorktreeServiceLive),
-        )
-        await Effect.runPromise(effect)
-      } catch (error) {
-        console.error('✗ Error:', error instanceof Error ? error.message : String(error))
         process.exit(1)
       }
     })

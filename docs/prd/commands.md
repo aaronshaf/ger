@@ -262,26 +262,6 @@ ger vote <change-id> --label "Custom-Label" +1
 | `--label <name> <score>` | Custom label vote |
 | `-m <message>` | Optional message with vote |
 
-### review
-
-AI-powered code review (multi-stage).
-
-```bash
-ger review <change-id>
-ger review <change-id> --tool claude  # Specific AI tool
-ger review  # Auto-detect change from HEAD
-```
-
-| Option | Description |
-|--------|-------------|
-| `--tool <name>` | AI tool (claude, llm, opencode, gemini) |
-| `--inline-only` | Only post inline comments |
-| `--overall-only` | Only post overall review |
-
-**Stages:**
-1. **Inline**: Generate line-specific comments
-2. **Overall**: Generate high-level assessment
-
 ### add-reviewer
 
 Add reviewers or groups to a change.
