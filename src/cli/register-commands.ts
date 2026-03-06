@@ -28,6 +28,8 @@ import { workspaceCommand } from './commands/workspace'
 import { sanitizeCDATA } from '@/utils/shell-safety'
 import { registerGroupCommands } from './register-group-commands'
 import { registerReviewerCommands } from './register-reviewer-commands'
+import { filesCommand } from './commands/files'
+import { reviewersCommand } from './commands/reviewers'
 
 // Helper function to output error in plain text, JSON, or XML format
 function outputError(
@@ -576,6 +578,44 @@ Note:
         console.error('Error:', error instanceof Error ? error.message : String(error))
         process.exit(1)
       }
+    })
+
+  // files command
+  program
+    .command('files [change-id]')
+    .description(
+      'List files changed in a Gerrit change (auto-detects from HEAD commit if not specified)',
+    )
+    .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
+    .action(async (changeId, options) => {
+      await executeEffect(
+        filesCommand(changeId, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'files_result',
+      )
+    })
+
+  // reviewers command
+  program
+    .command('reviewers [change-id]')
+    .description(
+      'List reviewers on a Gerrit change (auto-detects from HEAD commit if not specified)',
+    )
+    .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
+    .action(async (changeId, options) => {
+      await executeEffect(
+        reviewersCommand(changeId, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'reviewers_result',
+      )
     })
 
   // checkout command

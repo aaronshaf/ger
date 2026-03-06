@@ -570,6 +570,8 @@ const ReviewerAccountInfo = Schema.Struct({
   username: Schema.optional(Schema.String),
 })
 
+export type { ReviewerListItem } from './reviewer'
+
 export const ReviewerResult: Schema.Schema<{
   readonly input: string
   readonly reviewers?: ReadonlyArray<{

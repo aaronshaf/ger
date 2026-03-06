@@ -18,6 +18,7 @@ import {
   GroupDetailInfo,
   AccountInfo,
 } from '@/schemas/gerrit'
+import { ReviewerListItem } from '@/schemas/reviewer'
 import { filterMeaningfulMessages } from '@/utils/message-filters'
 import { convertToUnifiedDiff } from '@/utils/diff-formatters'
 import { ConfigService } from '@/services/config'
@@ -86,6 +87,7 @@ export interface GerritApiServiceImpl {
   readonly getGroup: (groupId: string) => Effect.Effect<GroupInfo, ApiError>
   readonly getGroupDetail: (groupId: string) => Effect.Effect<GroupDetailInfo, ApiError>
   readonly getGroupMembers: (groupId: string) => Effect.Effect<readonly AccountInfo[], ApiError>
+  readonly getReviewers: (changeId: string) => Effect.Effect<readonly ReviewerListItem[], ApiError>
   readonly removeReviewer: (
     changeId: string,
     accountId: string,
@@ -227,13 +229,8 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           const { credentials, authHeader } = yield* getCredentialsAndAuth
           let url = `${credentials.host}/a/projects/`
           if (options?.pattern) url += `?p=${encodeURIComponent(options.pattern)}`
-          const projectsRecord = yield* makeRequest(
-            url,
-            authHeader,
-            'GET',
-            undefined,
-            Schema.Record({ key: Schema.String, value: ProjectInfo }),
-          )
+          const schema = Schema.Record({ key: Schema.String, value: ProjectInfo })
+          const projectsRecord = yield* makeRequest(url, authHeader, 'GET', undefined, schema)
           return Object.values(projectsRecord).sort((a, b) => a.name.localeCompare(b.name))
         })
 
@@ -581,6 +578,15 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           return yield* makeRequest(url, authHeader, 'GET', undefined, Schema.Array(AccountInfo))
         })
 
+      const getReviewers = (changeId: string) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const normalized = yield* normalizeAndValidate(changeId)
+          const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/reviewers`
+          const schema = Schema.Array(ReviewerListItem)
+          return yield* makeRequest(url, authHeader, 'GET', undefined, schema)
+        })
+
       const removeReviewer = (
         changeId: string,
         accountId: string,
@@ -674,6 +680,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         getComments,
         getMessages,
         addReviewer,
+        getReviewers,
         listGroups,
         getGroup,
         getGroupDetail,
