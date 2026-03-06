@@ -28,7 +28,65 @@ ger show              # Auto-detect from HEAD
 - Full diff
 - All comments with context
 
-Reviewer listing for a specific change is provided by `show` (there is no separate `list-reviewers` command).
+### files
+
+List files changed in a change.
+
+```bash
+ger files [change-id]
+ger files 12345
+ger files              # Auto-detect from HEAD
+ger files 12345 --json
+ger files 12345 --xml
+```
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+| `--xml` | Output as XML for LLM consumption |
+
+**Output:** One file per line with status prefix (`M` modified, `A` added, `D` deleted, `R` renamed). Magic files (`/COMMIT_MSG`, `/MERGE_LIST`, `/PATCHSET_LEVEL`) are filtered out.
+
+**JSON output:**
+```json
+{
+  "status": "success",
+  "change_id": "12345",
+  "files": [
+    { "path": "src/foo.ts", "status": "M", "lines_inserted": 10, "lines_deleted": 2 }
+  ]
+}
+```
+
+### reviewers
+
+List reviewers on a change.
+
+```bash
+ger reviewers [change-id]
+ger reviewers 12345
+ger reviewers          # Auto-detect from HEAD
+ger reviewers 12345 --json
+ger reviewers 12345 --xml
+```
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+| `--xml` | Output as XML for LLM consumption |
+
+**Output:** One reviewer per line in `Name <email>` format (or email alone for email-only accounts).
+
+**JSON output:**
+```json
+{
+  "status": "success",
+  "change_id": "12345",
+  "reviewers": [
+    { "account_id": 1001, "name": "Alice Smith", "email": "alice@example.com", "username": "alice" }
+  ]
+}
+```
 
 ### diff
 
