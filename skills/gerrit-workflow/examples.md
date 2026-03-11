@@ -9,18 +9,19 @@ Real-world examples and workflows using the ger CLI tool.
 Start your day by checking incoming review requests:
 
 ```bash
-# Check what needs your review
+# Check what needs your review (reviewer:self OR cc:self)
+ger team
+# or equivalently:
 ger incoming
 
 # Show detailed info for each change
 ger show 12345
-ger show 12346
-ger show 12347
+ger diff 12345
 
 # Post reviews
 ger comment 12345 -m "LGTM! Nice refactoring."
+ger vote 12345 Code-Review +1
 ger comment 12346 -m "Please add tests for the new method" --unresolved
-ger comment 12347 -m "+1"
 ```
 
 ### Checking Your Own Changes
@@ -30,6 +31,8 @@ Monitor the status of your submitted changes:
 ```bash
 # List your open changes
 ger mine
+# or:
+ger list
 
 # Check build status for each
 ger build-status 12350 --watch
@@ -38,15 +41,12 @@ ger build-status 12350 --watch
 ger comments 12350
 
 # Address feedback with new patchset
-# (make local changes, commit, push)
 git add .
 git commit --amend
 ger push
 ```
 
-### Working with Work-in-Progress Changes (Optional)
-
-If you want to push changes that aren't ready for review yet, you can use WIP:
+### Work-in-Progress Changes
 
 ```bash
 # Push as WIP (won't notify reviewers)
@@ -59,514 +59,221 @@ ger push --wip
 
 # When ready for review
 ger push --ready
-```
+# or:
+ger set-ready -m "Ready for review"
 
-Search for WIP changes:
-```bash
-# Find all WIP changes
-ger search "is:wip"
-
-# Your WIP changes only
+# Find WIP changes
 ger search "owner:self is:wip"
-
-# Combine with other filters
-ger search "owner:self is:wip project:my-project"
 ```
 
-## Advanced Review Workflows
+## Reviewing Changes with Worktrees
 
-### Multi-File Review with Context
+Use worktrees to review a change in isolation without disturbing your current work:
+
+```bash
+# Create a worktree for the change
+ger tree setup 12345
+
+# Navigate into it
+cd .ger/12345
+
+# Review the code
+ger show 12345
+ger diff 12345
+
+# Make suggested fixes and push
+git add .
+git commit --amend
+ger push
+
+# Rebase onto latest main if needed
+ger tree rebase
+
+# Or interactive rebase
+ger tree rebase --interactive
+
+# When done, go back and clean up
+cd -
+ger tree cleanup 12345
+```
+
+## Cherry-Picking Changes
+
+Grab a specific change into your current branch:
+
+```bash
+# Cherry-pick latest patchset
+ger cherry 12345
+
+# Cherry-pick specific patchset
+ger cherry 12345/3
+
+# Stage only (review before committing)
+ger cherry 12345 --no-commit
+git diff --staged   # review changes
+git commit
+
+# Skip pre-commit hooks (use with care)
+ger cherry 12345 --no-verify
+
+# From a Gerrit URL
+ger cherry https://gerrit.instructure.com/c/canvas-lms/+/12345
+```
+
+## CI/CD Workflows
+
+### Wait for build, then get failures
+
+```bash
+# Full workflow: wait, then get failures
+ger build-status --watch --interval 20 --timeout 1800 && \
+  ger extract-url "build-summary-report" | tail -1 | jk failures --smart --xml
+
+# Just check status and exit non-zero on failure
+ger build-status --exit-status
+```
+
+### Retrigger CI
+
+```bash
+# Retrigger for the change in HEAD (auto-detected)
+ger retrigger
+
+# Retrigger a specific change
+ger retrigger 12345
+```
+
+### Rebase a stale change
+
+```bash
+# Server-side rebase (Gerrit does the rebase)
+ger rebase
+
+# Rebase even with conflicts
+ger rebase --allow-conflicts
+
+# Rebase onto a specific base
+ger rebase --base origin/main
+```
+
+## Analytics and Reporting
+
+```bash
+# Year-to-date analytics (default: Jan 1 to today)
+ger analyze
+
+# Specific date range
+ger analyze --start-date 2025-01-01 --end-date 2025-06-30
+
+# Filter by repo
+ger analyze --repo canvas-lms
+
+# Export to different formats
+ger analyze --markdown --output report.md
+ger analyze --csv --output report.csv
+ger analyze --json > analytics.json
+
+# Update local cache first
+ger update && ger analyze
+```
+
+## Multi-File Review with Context
 
 When reviewing large changes, examine each file individually:
 
 ```bash
 # Get overview
-ger show 12345
+ger show 12345 --xml
+
+# List changed files first
+ger files 12345
 
 # Review file by file
 ger diff 12345 --file src/api/client.ts
 ger diff 12345 --file src/api/types.ts
-ger diff 12345 --file tests/api/client.test.ts
 
 # Post inline comments
 ger comment 12345 --file src/api/client.ts --line 42 \
   -m "Consider adding error handling for network failures"
-
-ger comment 12345 --file src/api/types.ts --line 15 \
-  -m "This type should extend BaseResponse" --unresolved
 ```
 
-### Team Review Session
-
-Coordinate reviews during team sync:
+## Managing Teams / Reviewers
 
 ```bash
-# List all open changes
-ger open --limit 20
-
-# Filter by team member
-ger open --owner alice@example.com
-ger open --owner bob@example.com
-
-# Quick status check
-for id in 12345 12346 12347; do
-  echo "Change $id:"
-  ger build-status $id
-  ger comments $id --unresolved-only
-  echo "---"
-done
-```
-
-### Managing Team Reviewers with Groups
-
-Find and manage reviewer groups for your changes:
-
-```bash
-# Find all available groups
-ger groups
-
 # Find groups for your project
-ger groups --project my-project
+ger groups --project canvas-lms
 
-# Search for specific team groups
-ger groups --pattern "^team-.*"
-
-# View who's in a reviewer group before adding
-ger groups-show project-reviewers
-ger groups-members project-reviewers
+# View who's in a group before adding
+ger groups-show canvas-frontend-reviewers
+ger groups-members canvas-frontend-reviewers
 
 # Add entire team as reviewers
-ger add-reviewer --group project-reviewers -c 12345
-
-# Add admin group as CC for visibility
-ger add-reviewer --group administrators --cc -c 12345
-
-# Add multiple groups
-ger add-reviewer --group frontend-team -c 12345
-ger add-reviewer --group backend-team -c 12345
-```
-
-**Practical workflow for finding the right reviewers:**
-
-```bash
-# Step 1: Find groups for your project
-ger groups --project canvas-lms --pattern ".*-reviewers"
-
-# Step 2: Check who's in the group
-ger groups-show canvas-frontend-reviewers
-
-# Step 3: Add the group to your change
 ger add-reviewer --group canvas-frontend-reviewers -c 12345
 
-# Step 4: Verify they were added (check the change)
-ger show 12345
-```
+# Add manager as CC
+ger add-reviewer --cc manager@example.com -c 12345
 
-**Automation example - add reviewers based on file changes:**
+# Remove reviewer
+ger remove-reviewer user@example.com -c 12345
 
-```bash
-#!/bin/bash
-# auto-add-reviewers.sh
-
-CHANGE_ID=$1
-
-# Get the list of changed files
-FILES=$(ger diff $CHANGE_ID --files-only)
-
-# Add appropriate team based on files
-if echo "$FILES" | grep -q "^src/api/"; then
-  ger add-reviewer --group api-team -c $CHANGE_ID
-fi
-
-if echo "$FILES" | grep -q "^src/frontend/"; then
-  ger add-reviewer --group frontend-team -c $CHANGE_ID
-fi
-
-if echo "$FILES" | grep -q "^db/migrations/"; then
-  ger add-reviewer --group database-team -c $CHANGE_ID
-fi
-```
-
-## AI-Assisted Code Review
-
-### Using AI for Automated Review
-
-Integrate with AI tools for comprehensive code analysis:
-
-```bash
-# Get the diff
-ger diff 12345 > /tmp/change.diff
-
-# Run AI analysis
-cat /tmp/change.diff | ai-code-review --model gpt-4 > /tmp/review.txt
-
-# Post AI-generated feedback
-cat /tmp/review.txt | ger comment 12345
-
-# Or do it all in one pipeline
-ger diff 12345 | ai-code-review --model gpt-4 | ger comment 12345
-```
-
-### Custom AI Review Script
-
-Create a wrapper script for consistent AI reviews:
-
-```bash
-#!/bin/bash
-# ai-gerrit-review.sh
-
-CHANGE_ID=$1
-
-# Get change details
-INFO=$(ger show $CHANGE_ID --format json)
-DIFF=$(ger diff $CHANGE_ID)
-
-# Create prompt for AI
-PROMPT="Review this code change:
-
-Change Info:
-$INFO
-
-Diff:
-$DIFF
-
-Please provide:
-1. Overall assessment
-2. Potential bugs or issues
-3. Performance concerns
-4. Security considerations
-5. Suggestions for improvement
-"
-
-# Get AI review
-REVIEW=$(echo "$PROMPT" | ai-tool analyze)
-
-# Post review
-echo "$REVIEW" | ger comment $CHANGE_ID
-
-echo "AI review posted to change $CHANGE_ID"
-```
-
-Usage:
-```bash
-./ai-gerrit-review.sh 12345
-```
-
-## CI/CD Integration
-
-### Jenkins Build Monitoring
-
-Monitor Jenkins builds for Gerrit changes:
-
-```bash
-# Check build status
-ger build-status 12345
-
-# Wait for build to complete
-ger build-status 12345 --watch --timeout 1800
-
-# Extract build URL
-ger extract-url "build-summary-report" 12345 | tail -1
-
-# Complete workflow: wait for build, then extract URL
-ger build-status 12345 --watch --interval 20 --timeout 1800 && \
-  ger extract-url "build-summary-report" 12345 | tail -1
-```
-
-### Automated Build Status Notifications
-
-Create a script to monitor builds and notify on completion:
-
-```bash
-#!/bin/bash
-# watch-build.sh
-
-CHANGE_ID=$1
-SLACK_WEBHOOK=$2
-
-echo "Monitoring build for change $CHANGE_ID..."
-
-# Wait for build
-if ger build-status $CHANGE_ID --watch --timeout 3600; then
-  STATUS="SUCCESS"
-  MESSAGE="Build passed for change $CHANGE_ID"
-else
-  STATUS="FAILURE"
-  BUILD_URL=$(ger extract-url "build-summary-report" $CHANGE_ID | tail -1)
-  MESSAGE="Build failed for change $CHANGE_ID. See: $BUILD_URL"
-fi
-
-# Send notification
-curl -X POST -H 'Content-type: application/json' \
-  --data "{\"text\":\"$MESSAGE\"}" \
-  $SLACK_WEBHOOK
-
-echo "$STATUS"
+# Suppress notifications when adding
+ger add-reviewer --notify none user@example.com -c 12345
 ```
 
 ## Batch Operations
 
-### Review Multiple Changes
-
-Process multiple changes efficiently:
+### Check all changes in your review queue
 
 ```bash
 #!/bin/bash
-# batch-review.sh
-
-CHANGES=(12345 12346 12347 12348)
-
-for CHANGE in "${CHANGES[@]}"; do
-  echo "Reviewing change $CHANGE..."
-
-  # Show change
-  ger show $CHANGE
-
-  # Wait for user input
-  read -p "Review comment (or 'skip'): " COMMENT
-
-  if [ "$COMMENT" != "skip" ]; then
-    ger comment $CHANGE -m "$COMMENT"
-    echo "Comment posted to $CHANGE"
-  fi
-
-  echo "---"
-done
-
-echo "Batch review complete"
+# Review incoming changes with filter
+ger incoming --filter "project:canvas-lms" --xml | \
+  # process with your tool of choice
+  xq '.list_result.changes.change[]' -r '.change_number'
 ```
 
-### Abandon Stale Changes
-
-Clean up old changes:
+### Abandon stale changes
 
 ```bash
-#!/bin/bash
-# abandon-stale.sh
-
-# Get your changes (assuming ger mine outputs change IDs)
-CHANGES=$(ger mine --format json | jq -r '.[] | select(.updated < "2024-01-01") | .id')
-
-for CHANGE in $CHANGES; do
-  echo "Change $CHANGE is stale"
-  read -p "Abandon? (y/n): " CONFIRM
-
-  if [ "$CONFIRM" = "y" ]; then
-    ger abandon $CHANGE --message "Abandoning stale change"
-    echo "Abandoned $CHANGE"
-  fi
-done
+# Find your open changes as JSON
+ger mine --json | jq -r '.[] | select(.updated < "2024-01-01") | .id' | \
+  xargs -I{} ger abandon {} -m "Abandoning stale change"
 ```
 
-## Troubleshooting Scenarios
-
-### Debugging Failed Builds
-
-When a build fails, investigate systematically:
+## Output Format Examples
 
 ```bash
-# Get build status
-ger build-status 12345
+# JSON — good for scripting with jq
+ger show 12345 --json | jq '.subject'
+ger mine --json | jq '.[].change_number'
 
-# Get build summary URL
-BUILD_URL=$(ger extract-url "build-summary-report" 12345 | tail -1)
+# XML — preferred for LLM/AI consumption
+ger show 12345 --xml
+ger incoming --xml
+ger diff 12345 --xml
 
-# Post build URL as comment
-ger comment 12345 -m "Build failed. See: $BUILD_URL"
-```
-
-### Resolving Merge Conflicts
-
-When a change has merge conflicts:
-
-```bash
-# Checkout the change
-ger checkout 12345
-
-# Rebase onto latest main
-git fetch origin
-git rebase origin/main
-
-# Resolve conflicts
-# (edit files, git add, git rebase --continue)
-
-# Push updated patchset
-git push origin HEAD:refs/for/main
-
-# Notify reviewers
-ger comment 12345 -m "Rebased onto latest main and resolved merge conflicts. Ready for re-review."
-```
-
-### Recovery from Accidental Abandon
-
-If you accidentally abandoned a change:
-
-```bash
-# Note: ger doesn't have restore command yet, use Gerrit UI or API directly
-# This is a placeholder for future functionality
-
-# For now, use git to create new change from same commits
-ger checkout 12345
-git push origin HEAD:refs/for/main
-
-# Add comment explaining
-ger comment <new-change-id> -m "Re-uploaded change that was accidentally abandoned (was #12345)"
-```
-
-## Performance Optimization
-
-### Caching Strategies
-
-Optimize performance with smart caching:
-
-```bash
-# Pre-cache frequently accessed changes
-for id in 12345 12346 12347; do
-  ger show $id > /dev/null 2>&1 &
-done
-wait
-
-# Now access them quickly (from cache)
+# Plain text — human-readable colored output
+ger team
+ger mine
 ger show 12345
-ger show 12346
-ger show 12347
-
-# Force fresh data when needed
-ger show 12345 --no-cache
 ```
 
-### Parallel Operations
+## Shell Aliases
 
-Speed up batch operations with parallelization:
-
-```bash
-# Sequential (slow)
-for id in 12345 12346 12347 12348 12349; do
-  ger show $id
-done
-
-# Parallel (fast)
-for id in 12345 12346 12347 12348 12349; do
-  ger show $id &
-done
-wait
-```
-
-## Scripting Best Practices
-
-### Error Handling
-
-Always handle errors in scripts:
-
-```bash
-#!/bin/bash
-set -e  # Exit on error
-
-CHANGE_ID=$1
-
-if [ -z "$CHANGE_ID" ]; then
-  echo "Error: Change ID required"
-  echo "Usage: $0 <change-id>"
-  exit 1
-fi
-
-# Check if change exists
-if ! ger show $CHANGE_ID > /dev/null 2>&1; then
-  echo "Error: Change $CHANGE_ID not found"
-  exit 1
-fi
-
-# Proceed with operation
-ger diff $CHANGE_ID
-```
-
-### JSON Processing
-
-Use jq for parsing JSON output:
-
-```bash
-# Extract specific fields
-ger show 12345 --format json | jq '.subject'
-ger show 12345 --format json | jq '.owner.email'
-
-# Filter comments
-ger comments 12345 --format json | jq '.[] | select(.unresolved == true)'
-
-# Get list of changed files
-ger show 12345 --format json | jq -r '.files[].path'
-```
-
-### Integration Functions
-
-Create reusable functions:
-
-```bash
-# Add to ~/.bashrc or ~/.zshrc
-
-# Quick review function
-grev() {
-  local change_id=$1
-  ger show $change_id
-  echo ""
-  read -p "Comment: " comment
-  [ -n "$comment" ] && ger comment $change_id -m "$comment"
-}
-
-# Check build and extract URL
-gbuild() {
-  local change_id=$1
-  ger build-status $change_id --watch && \
-    ger extract-url "build-summary-report" $change_id | tail -1
-}
-
-# AI review shortcut
-gaireview() {
-  local change_id=$1
-  ger diff $change_id | ai-review-tool | ger comment $change_id
-}
-```
-
-Usage:
-```bash
-grev 12345          # Quick review
-gbuild 12345        # Monitor build
-gaireview 12345     # AI review
-```
-
-## Tips and Tricks
-
-### Quick Change Navigation
-
-```bash
-# Checkout latest incoming change
-ger incoming --format json | jq -r '.[0].id' | xargs ger checkout
-
-# Review oldest unreviewed change
-ger incoming --format json | jq -r '.[-1].id' | xargs ger show
-```
-
-### Custom Aliases
-
-Add to your shell config:
+Add to your shell config for quick access:
 
 ```bash
 alias gm='ger mine'
 alias gi='ger incoming'
-alias go='ger open'
+alias gt='ger team'
 alias gs='ger show'
 alias gd='ger diff'
 alias gc='ger comment'
-```
+alias gp='ger push'
 
-### Output Formatting
-
-```bash
-# Compact view
-ger mine --format list | head -5
-
-# Detailed table
-ger open --format table
-
-# Machine-readable
-ger mine --format json | jq '.'
+# Quick CI wait
+gbuild() {
+  ger build-status --watch --interval 20 --timeout 1800 && \
+    ger extract-url "build-summary-report" | tail -1
+}
 ```
