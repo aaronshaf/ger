@@ -100,8 +100,9 @@ ger comment [change-id] --file src/api/client.ts --line 42 -m "Inline comment"
 
 **Vote on a change:**
 ```bash
-ger vote [change-id] Code-Review +2
-ger vote [change-id] Verified -1
+ger vote <change-id> --code-review 2
+ger vote <change-id> --verified 1 --message "Looks good"
+ger vote <change-id> --label My-Label 1
 ```
 
 ### Managing Changes
@@ -213,10 +214,10 @@ ger analyze --output report.md   # write to file
 ```
 Default start date: January 1 of current year.
 
-**Update local cache of merged changes:**
+**Update ger to the latest version:**
 ```bash
 ger update
-ger update --since 2025-01-01
+ger update --skip-pull   # reinstall without version check
 ```
 
 **View recent failures summary:**

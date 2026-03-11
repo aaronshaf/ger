@@ -100,29 +100,22 @@ ger restore 12345
 ### Connection Status
 ```bash
 ger status
-ger status --pretty
 ```
 
 ### Show Change Details
 ```bash
 # Complete change info with metadata, diff, inline comments, and review activity
 ger show 12345
-ger show 12345 --pretty
 ```
 
 ### List Changes
 ```bash
 # Your changes
 ger mine
-ger mine --pretty
 
-# Incoming reviews
+# Incoming reviews (reviewer:self OR cc:self)
 ger incoming
-ger incoming --pretty
-
-# Workspace changes (local branch tracking)
-ger workspace
-ger workspace --pretty
+ger team
 ```
 
 ### Search Changes
@@ -274,7 +267,6 @@ cat comments.json | ger comment 12345 --batch
 ```bash
 # View all comments with diff context
 ger comments 12345
-ger comments 12345 --pretty
 ```
 
 ### Extract URLs
@@ -415,7 +407,6 @@ ger build-status --watch | tail -1 | jq -r '.state'
 ```bash
 # Full diff
 ger diff 12345
-ger diff 12345 --pretty
 
 # List changed files
 ger diff 12345 --files-only
@@ -783,13 +774,6 @@ echo "LGTM" | ger comment 12345
   <change_id>12345</change_id>
   <message><![CDATA[LGTM]]></message>
 </comment_result>
-```
-
-### Pretty (--pretty flag)
-```
-Comment posted successfully
-Change: Fix authentication bug (NEW)
-Message: LGTM
 ```
 
 ## Upgrading

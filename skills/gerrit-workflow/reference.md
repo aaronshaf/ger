@@ -54,6 +54,7 @@ ger diff [change-id] [options]
 **Options:**
 - `--file <path>` — Show diff for specific file only
 - `--base <revision>` — Compare against specific base revision
+- `--files-only` — List changed filenames only (no diff content)
 - `--json` — JSON output
 - `--xml` — XML output
 
@@ -244,15 +245,23 @@ Vote on a Gerrit change.
 
 **Syntax:**
 ```bash
-ger vote [change-id] <label> <score>
+ger vote <change-id> [options]
 ```
+
+**Options:**
+- `--code-review <n>` — Code-Review vote (-2 to +2)
+- `--verified <n>` — Verified vote (-1 to +1)
+- `--label <name> <value>` — Custom label (repeatable)
+- `--message <text>` — Optional comment with the vote
+- `--json` — JSON output
+- `--xml` — XML output
 
 **Examples:**
 ```bash
-ger vote 12345 Code-Review +2
-ger vote 12345 Code-Review -1
-ger vote 12345 Verified +1
-ger vote --xml
+ger vote 12345 --code-review 2
+ger vote 12345 --code-review -1
+ger vote 12345 --verified 1 --message "Looks good"
+ger vote 12345 --label My-Label 1
 ```
 
 ---
@@ -557,7 +566,7 @@ ger analyze --csv --output report.csv
 
 ### update
 
-Update local cache of merged changes.
+Update ger to the latest version (self-update).
 
 **Syntax:**
 ```bash
@@ -565,8 +574,7 @@ ger update [options]
 ```
 
 **Options:**
-- `--since <YYYY-MM-DD>` — Fetch changes since this date
-- `--json` — JSON output
+- `--skip-pull` — Skip version check, just reinstall
 
 ---
 

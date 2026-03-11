@@ -20,7 +20,7 @@ ger diff 12345
 
 # Post reviews
 ger comment 12345 -m "LGTM! Nice refactoring."
-ger vote 12345 Code-Review +1
+ger vote 12345 --code-review 1
 ger comment 12346 -m "Please add tests for the new method" --unresolved
 ```
 
@@ -174,7 +174,7 @@ ger analyze --csv --output report.csv
 ger analyze --json > analytics.json
 
 # Update local cache first
-ger update && ger analyze
+ger analyze
 ```
 
 ## Multi-File Review with Context
