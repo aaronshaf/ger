@@ -46,7 +46,7 @@ function getVersion(): string {
 
 const program = new Command()
 
-program.name('ger').description('LLM-centric Gerrit CLI tool').version(getVersion())
+program.name('ger').description('Gerrit CLI tool').version(getVersion())
 
 program.addHelpText(
   'after',
