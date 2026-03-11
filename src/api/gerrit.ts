@@ -24,104 +24,13 @@ import { convertToUnifiedDiff } from '@/utils/diff-formatters'
 import { ConfigService } from '@/services/config'
 import { normalizeChangeIdentifier } from '@/utils/change-id'
 
-export interface GerritApiServiceImpl {
-  readonly getChange: (changeId: string) => Effect.Effect<ChangeInfo, ApiError>
-  readonly listChanges: (query?: string) => Effect.Effect<readonly ChangeInfo[], ApiError>
-  readonly listProjects: (options?: {
-    pattern?: string
-  }) => Effect.Effect<readonly ProjectInfo[], ApiError>
-  readonly postReview: (changeId: string, review: ReviewInput) => Effect.Effect<void, ApiError>
-  readonly abandonChange: (changeId: string, message?: string) => Effect.Effect<void, ApiError>
-  readonly restoreChange: (
-    changeId: string,
-    message?: string,
-  ) => Effect.Effect<ChangeInfo, ApiError>
-  readonly rebaseChange: (
-    changeId: string,
-    options?: { base?: string },
-  ) => Effect.Effect<ChangeInfo, ApiError>
-  readonly submitChange: (changeId: string) => Effect.Effect<SubmitInfo, ApiError>
-  readonly testConnection: Effect.Effect<boolean, ApiError>
-  readonly getRevision: (
-    changeId: string,
-    revisionId?: string,
-  ) => Effect.Effect<RevisionInfo, ApiError>
-  readonly getFiles: (
-    changeId: string,
-    revisionId?: string,
-  ) => Effect.Effect<Record<string, FileInfo>, ApiError>
-  readonly getFileDiff: (
-    changeId: string,
-    filePath: string,
-    revisionId?: string,
-    base?: string,
-  ) => Effect.Effect<FileDiffContent, ApiError>
-  readonly getFileContent: (
-    changeId: string,
-    filePath: string,
-    revisionId?: string,
-  ) => Effect.Effect<string, ApiError>
-  readonly getPatch: (changeId: string, revisionId?: string) => Effect.Effect<string, ApiError>
-  readonly getDiff: (
-    changeId: string,
-    options?: DiffOptions,
-  ) => Effect.Effect<string | string[] | Record<string, unknown> | FileDiffContent, ApiError>
-  readonly getComments: (
-    changeId: string,
-    revisionId?: string,
-  ) => Effect.Effect<Record<string, readonly CommentInfo[]>, ApiError>
-  readonly getMessages: (changeId: string) => Effect.Effect<readonly MessageInfo[], ApiError>
-  readonly addReviewer: (
-    changeId: string,
-    reviewer: string,
-    options?: { state?: 'REVIEWER' | 'CC'; notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL' },
-  ) => Effect.Effect<ReviewerResult, ApiError>
-  readonly listGroups: (options?: {
-    owned?: boolean
-    project?: string
-    user?: string
-    pattern?: string
-    limit?: number
-    skip?: number
-  }) => Effect.Effect<readonly GroupInfo[], ApiError>
-  readonly getGroup: (groupId: string) => Effect.Effect<GroupInfo, ApiError>
-  readonly getGroupDetail: (groupId: string) => Effect.Effect<GroupDetailInfo, ApiError>
-  readonly getGroupMembers: (groupId: string) => Effect.Effect<readonly AccountInfo[], ApiError>
-  readonly getReviewers: (changeId: string) => Effect.Effect<readonly ReviewerListItem[], ApiError>
-  readonly removeReviewer: (
-    changeId: string,
-    accountId: string,
-    options?: { notify?: 'NONE' | 'OWNER' | 'OWNER_REVIEWERS' | 'ALL' },
-  ) => Effect.Effect<void, ApiError>
-  readonly getTopic: (changeId: string) => Effect.Effect<string | null, ApiError>
-  readonly setTopic: (changeId: string, topic: string) => Effect.Effect<string, ApiError>
-  readonly deleteTopic: (changeId: string) => Effect.Effect<void, ApiError>
-  readonly setReady: (changeId: string, message?: string) => Effect.Effect<void, ApiError>
-  readonly setWip: (changeId: string, message?: string) => Effect.Effect<void, ApiError>
-}
+export type { GerritApiServiceImpl, ApiErrorFields } from './gerrit-types'
+export { ApiError } from './gerrit-types'
+import { ApiError, type GerritApiServiceImpl } from './gerrit-types'
 
 export const GerritApiService: Context.Tag<GerritApiServiceImpl, GerritApiServiceImpl> =
   Context.GenericTag<GerritApiServiceImpl>('GerritApiService')
 export type GerritApiService = Context.Tag.Identifier<typeof GerritApiService>
-
-export interface ApiErrorFields {
-  readonly message: string
-  readonly status?: number
-}
-
-const ApiErrorSchema = Schema.TaggedError<ApiErrorFields>()('ApiError', {
-  message: Schema.String,
-  status: Schema.optional(Schema.Number),
-} as const) as unknown
-
-export class ApiError
-  extends (ApiErrorSchema as new (
-    args: ApiErrorFields,
-  ) => ApiErrorFields & Error & { readonly _tag: 'ApiError' })
-  implements Error
-{
-  readonly name = 'ApiError'
-}
 
 const createAuthHeader = (credentials: GerritCredentials): string => {
   const auth = btoa(`${credentials.username}:${credentials.password}`)
@@ -260,12 +169,17 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           return yield* makeRequest(url, authHeader, 'POST', body, ChangeInfo)
         })
 
-      const rebaseChange = (changeId: string, options?: { base?: string }) =>
+      const rebaseChange = (
+        changeId: string,
+        options?: { base?: string; allowConflicts?: boolean },
+      ) =>
         Effect.gen(function* () {
           const { credentials, authHeader } = yield* getCredentialsAndAuth
           const normalized = yield* normalizeAndValidate(changeId)
           const url = `${credentials.host}/a/changes/${encodeURIComponent(normalized)}/revisions/current/rebase`
-          const body = options?.base ? { base: options.base } : {}
+          const body: Record<string, string | boolean> = {}
+          if (options?.base) body['base'] = options.base
+          if (options?.allowConflicts) body['allow_conflicts'] = true
           return yield* makeRequest(url, authHeader, 'POST', body, ChangeInfo)
         })
 
@@ -661,6 +575,50 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
           yield* makeRequest(url, authHeader, 'POST', body)
         })
 
+      const fetchMergedChanges = (options: {
+        after: string
+        before?: string
+        repo?: string
+        maxResults?: number
+      }) =>
+        Effect.gen(function* () {
+          const { credentials, authHeader } = yield* getCredentialsAndAuth
+          const limit = options.maxResults ?? 500
+          const pageSize = Math.min(limit, 500)
+          const allChanges: ChangeInfo[] = []
+          let start = 0
+          let hasMore = true
+
+          while (hasMore) {
+            let q = `status:merged after:${options.after}`
+            if (options.before) q += ` before:${options.before}`
+            if (options.repo) q += ` project:${options.repo}`
+            const url = `${credentials.host}/a/changes/?q=${encodeURIComponent(q)}&o=DETAILED_ACCOUNTS&n=${pageSize}&S=${start}`
+            const page = yield* makeRequest(
+              url,
+              authHeader,
+              'GET',
+              undefined,
+              Schema.Array(ChangeInfo),
+            )
+            allChanges.push(...page)
+            const remaining = limit - allChanges.length
+            if (page.length < pageSize || remaining <= 0) {
+              hasMore = false
+            } else {
+              start += pageSize
+            }
+          }
+
+          if (allChanges.length >= limit) {
+            console.warn(
+              `Warning: results capped at ${limit}. Use --start-date to narrow the date range.`,
+            )
+          }
+
+          return allChanges as readonly ChangeInfo[]
+        })
+
       return {
         getChange,
         listChanges,
@@ -691,6 +649,7 @@ export const GerritApiServiceLive: Layer.Layer<GerritApiService, never, ConfigSe
         deleteTopic,
         setReady,
         setWip,
+        fetchMergedChanges,
       }
     }),
   )

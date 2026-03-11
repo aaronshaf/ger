@@ -7,6 +7,7 @@ export const AppConfig: Schema.Struct<{
   password: typeof Schema.String
   aiTool: Schema.optional<Schema.Literal<['claude', 'llm', 'opencode', 'gemini']>>
   aiAutoDetect: Schema.optionalWith<typeof Schema.Boolean, { default: () => boolean }>
+  retriggerComment: Schema.optional<typeof Schema.String>
 }> = Schema.Struct({
   // Gerrit credentials (flattened)
   host: Schema.String.pipe(
@@ -24,6 +25,8 @@ export const AppConfig: Schema.Struct<{
   // AI configuration (flattened)
   aiTool: Schema.optional(Schema.Literal('claude', 'llm', 'opencode', 'gemini')),
   aiAutoDetect: Schema.optionalWith(Schema.Boolean, { default: (): boolean => true }),
+  // CI retrigger comment
+  retriggerComment: Schema.optional(Schema.String),
 })
 
 export type AppConfig = Schema.Schema.Type<typeof AppConfig>

@@ -10,6 +10,7 @@ export const createMockConfigService = (
     password: 'testpass',
   },
   aiConfig: AiConfig = { autoDetect: true },
+  retriggerComment?: string,
 ): ConfigServiceImpl => ({
   getCredentials: Effect.succeed(credentials),
   saveCredentials: () => Effect.succeed(undefined as void),
@@ -22,6 +23,9 @@ export const createMockConfigService = (
     password: credentials.password,
     aiTool: aiConfig.tool,
     aiAutoDetect: aiConfig.autoDetect ?? true,
+    retriggerComment,
   } as AppConfig),
   saveFullConfig: () => Effect.succeed(undefined as void),
+  getRetriggerComment: Effect.succeed(retriggerComment),
+  saveRetriggerComment: () => Effect.succeed(undefined as void),
 })

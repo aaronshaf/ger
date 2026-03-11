@@ -15,9 +15,7 @@ import { commentCommand, COMMENT_HELP_TEXT } from './commands/comment'
 import { commentsCommand } from './commands/comments'
 import { diffCommand } from './commands/diff'
 import { extractUrlCommand } from './commands/extract-url'
-import { incomingCommand } from './commands/incoming'
 import { installHookCommand } from './commands/install-hook'
-import { mineCommand } from './commands/mine'
 import { openCommand } from './commands/open'
 import { pushCommand, PUSH_HELP_TEXT } from './commands/push'
 import { searchCommand, SEARCH_HELP_TEXT } from './commands/search'
@@ -28,8 +26,13 @@ import { workspaceCommand } from './commands/workspace'
 import { sanitizeCDATA } from '@/utils/shell-safety'
 import { registerGroupCommands } from './register-group-commands'
 import { registerReviewerCommands } from './register-reviewer-commands'
+import { registerTreeCommands } from './register-tree-commands'
 import { filesCommand } from './commands/files'
 import { reviewersCommand } from './commands/reviewers'
+import { retriggerCommand, RETRIGGER_HELP_TEXT } from './commands/retrigger'
+import { cherryCommand, CHERRY_HELP_TEXT } from './commands/cherry'
+import { registerListCommands } from './register-list-commands'
+import { registerAnalyticsCommands } from './register-analytics-commands'
 
 // Helper function to output error in plain text, JSON, or XML format
 function outputError(
@@ -154,22 +157,7 @@ export function registerCommands(program: Command): void {
       )
     })
 
-  // mine command
-  program
-    .command('mine')
-    .description('Show your open changes')
-    .option('--xml', 'XML output for LLM consumption')
-    .option('--json', 'JSON output for programmatic consumption')
-    .action(async (options) => {
-      await executeEffect(
-        mineCommand(options).pipe(
-          Effect.provide(GerritApiServiceLive),
-          Effect.provide(ConfigServiceLive),
-        ),
-        options,
-        'mine_result',
-      )
-    })
+  registerListCommands(program)
 
   // search command
   program
@@ -201,15 +189,16 @@ export function registerCommands(program: Command): void {
       })
     })
 
-  // workspace command
+  // workspace command (deprecated — use 'ger tree setup' instead)
   program
     .command('workspace <change-id>')
-    .description(
-      'Create or switch to a git worktree for a Gerrit change (accepts change number or Change-ID)',
-    )
+    .description('[deprecated: use "ger tree setup"] Create a git worktree for a Gerrit change')
     .option('--xml', 'XML output for LLM consumption')
     .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
+      if (!options.xml && !options.json) {
+        console.error('Note: "ger workspace" is deprecated. Use "ger tree setup" instead.')
+      }
       await executeEffect(
         workspaceCommand(changeId, options).pipe(
           Effect.provide(GerritApiServiceLive),
@@ -220,23 +209,7 @@ export function registerCommands(program: Command): void {
       )
     })
 
-  // incoming command
-  program
-    .command('incoming')
-    .description('Show incoming changes for review (where you are a reviewer)')
-    .option('--xml', 'XML output for LLM consumption')
-    .option('--json', 'JSON output for programmatic consumption')
-    .option('-i, --interactive', 'Interactive mode with detailed view and diff')
-    .action(async (options) => {
-      await executeEffect(
-        incomingCommand(options).pipe(
-          Effect.provide(GerritApiServiceLive),
-          Effect.provide(ConfigServiceLive),
-        ),
-        options,
-        'incoming_result',
-      )
-    })
+  registerTreeCommands(program)
 
   // abandon / restore / set-ready / set-wip commands
   registerStateCommands(program)
@@ -246,11 +219,12 @@ export function registerCommands(program: Command): void {
     .command('rebase [change-id]')
     .description('Rebase a change onto target branch (auto-detects from HEAD if not provided)')
     .option('--base <ref>', 'Base revision to rebase onto (default: target branch HEAD)')
+    .option('--allow-conflicts', 'Allow rebasing even if conflicts exist')
     .option('--xml', 'XML output for LLM consumption')
     .option('--json', 'JSON output for programmatic consumption')
     .action(async (changeId, options) => {
       await executeEffect(
-        rebaseCommand(changeId, options).pipe(
+        rebaseCommand(changeId, { ...options, allowConflicts: options.allowConflicts }).pipe(
           Effect.provide(GerritApiServiceLive),
           Effect.provide(ConfigServiceLive),
         ),
@@ -339,6 +313,26 @@ export function registerCommands(program: Command): void {
 
   // Register all group-related commands
   registerGroupCommands(program)
+
+  // retrigger command
+  program
+    .command('retrigger [change-id]')
+    .description(
+      'Post the CI retrigger comment on a change (auto-detects from HEAD if no change-id given)',
+    )
+    .option('--xml', 'XML output for LLM consumption')
+    .option('--json', 'JSON output for programmatic consumption')
+    .addHelpText('after', RETRIGGER_HELP_TEXT)
+    .action(async (changeId, options) => {
+      await executeEffect(
+        retriggerCommand(changeId as string | undefined, options).pipe(
+          Effect.provide(GerritApiServiceLive),
+          Effect.provide(ConfigServiceLive),
+        ),
+        options,
+        'retrigger_result',
+      )
+    })
 
   // comments command
   program
@@ -636,5 +630,27 @@ Note:
         console.error('Error:', error instanceof Error ? error.message : String(error))
         process.exit(1)
       }
+    })
+
+  registerAnalyticsCommands(program)
+
+  // cherry command
+  program
+    .command('cherry <change-id>')
+    .description('Fetch and cherry-pick a Gerrit change onto the current branch')
+    .option('-n, --no-commit', 'Stage changes without committing')
+    .option('--no-verify', 'Bypass git commit hooks during cherry-pick')
+    .option('--remote <name>', 'Use specific git remote (default: auto-detect)')
+    .addHelpText('after', CHERRY_HELP_TEXT)
+    .action(async (changeId, options) => {
+      await executeEffect(
+        cherryCommand(changeId, {
+          noCommit: options.noCommit,
+          noVerify: options.noVerify,
+          remote: options.remote,
+        }).pipe(Effect.provide(GerritApiServiceLive), Effect.provide(ConfigServiceLive)),
+        options,
+        'cherry_result',
+      )
     })
 }

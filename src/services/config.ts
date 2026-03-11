@@ -14,6 +14,8 @@ export interface ConfigServiceImpl {
   readonly saveAiConfig: (config: AiConfig) => Effect.Effect<void, ConfigError>
   readonly getFullConfig: Effect.Effect<AppConfig, ConfigError>
   readonly saveFullConfig: (config: AppConfig) => Effect.Effect<void, ConfigError>
+  readonly getRetriggerComment: Effect.Effect<string | undefined, ConfigError>
+  readonly saveRetriggerComment: (comment: string) => Effect.Effect<void, ConfigError>
 }
 
 // Export both the tag value and the type for use in Effect requirements
@@ -237,6 +239,17 @@ export const ConfigServiceLive: Layer.Layer<ConfigService, never, never> = Layer
         yield* saveFullConfig(updatedConfig)
       })
 
+    const getRetriggerComment = Effect.gen(function* () {
+      const config = yield* getFullConfig.pipe(Effect.orElseSucceed(() => null))
+      return config?.retriggerComment
+    })
+
+    const saveRetriggerComment = (comment: string) =>
+      Effect.gen(function* () {
+        const existingConfig = yield* getFullConfig
+        yield* saveFullConfig({ ...existingConfig, retriggerComment: comment })
+      })
+
     return {
       getCredentials,
       saveCredentials,
@@ -245,6 +258,8 @@ export const ConfigServiceLive: Layer.Layer<ConfigService, never, never> = Layer
       saveAiConfig,
       getFullConfig,
       saveFullConfig,
+      getRetriggerComment,
+      saveRetriggerComment,
     }
   }),
 )

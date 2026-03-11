@@ -5,6 +5,7 @@ import { escapeXML, sanitizeCDATA } from '@/utils/shell-safety'
 
 interface RebaseOptions {
   base?: string
+  allowConflicts?: boolean
   xml?: boolean
   json?: boolean
 }
@@ -29,7 +30,10 @@ export const rebaseCommand = (
     const resolvedChangeId = changeId || (yield* getChangeIdFromHead())
 
     // Perform the rebase - this returns the rebased change info
-    const change = yield* gerritApi.rebaseChange(resolvedChangeId, { base: options.base })
+    const change = yield* gerritApi.rebaseChange(resolvedChangeId, {
+      base: options.base,
+      allowConflicts: options.allowConflicts,
+    })
 
     if (options.json) {
       console.log(

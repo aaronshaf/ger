@@ -193,11 +193,8 @@ const setupEffect = (configService: ConfigServiceImpl) =>
                   console.log(chalk.dim(`Detected AI tools: ${availableTools.join(', ')}`))
                 }
 
-                // Get default suggestion
-                const defaultCommand =
-                  existingConfig?.aiTool ||
-                  (availableTools.includes('claude') ? 'claude' : availableTools[0]) ||
-                  ''
+                // Get default suggestion — no default to claude
+                const defaultCommand = existingConfig?.aiTool || (availableTools[0] ?? '')
 
                 // AI tool command with smart default
                 const aiToolCommand = await input({
@@ -205,7 +202,20 @@ const setupEffect = (configService: ConfigServiceImpl) =>
                     availableTools.length > 0
                       ? 'AI tool command (detected from system)'
                       : 'AI tool command (e.g., claude, llm, opencode, gemini)',
-                  default: defaultCommand || 'claude',
+                  default: defaultCommand || undefined,
+                })
+
+                console.log('')
+                console.log(chalk.yellow('Optional: CI Retrigger'))
+                console.log(
+                  chalk.dim(
+                    'Comment to post when triggering a CI build (e.g. a magic trigger string your CI watches for)',
+                  ),
+                )
+
+                const retriggerComment = await input({
+                  message: 'CI retrigger comment (leave blank to skip)',
+                  default: existingConfig?.retriggerComment ?? undefined,
                 })
 
                 // Build flat config
@@ -217,6 +227,9 @@ const setupEffect = (configService: ConfigServiceImpl) =>
                     aiTool: aiToolCommand,
                   }),
                   aiAutoDetect: !aiToolCommand,
+                  ...(retriggerComment.trim() && {
+                    retriggerComment: retriggerComment.trim(),
+                  }),
                 }
 
                 // Validate config using Schema instead of type assertion
