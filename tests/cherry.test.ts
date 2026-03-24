@@ -97,7 +97,9 @@ describe('cherry command', () => {
       ),
     )
 
-    const spawnCalls = mockSpawnSync.mock.calls as unknown as [string, string[]][]
+    const spawnCalls = (mockSpawnSync.mock.calls as unknown as [string, string[]][]).filter(
+      ([, args]) => Array.isArray(args),
+    )
     expect(spawnCalls.some(([, args]) => args.includes('fetch'))).toBe(true)
     expect(
       spawnCalls.some(([, args]) => args.includes('cherry-pick') && args.includes('FETCH_HEAD')),
@@ -117,7 +119,9 @@ describe('cherry command', () => {
       ),
     )
 
-    const spawnCalls = mockSpawnSync.mock.calls as unknown as [string, string[]][]
+    const spawnCalls = (mockSpawnSync.mock.calls as unknown as [string, string[]][]).filter(
+      ([, args]) => Array.isArray(args),
+    )
     expect(spawnCalls.some(([, args]) => args.includes('cherry-pick') && args.includes('-n'))).toBe(
       true,
     )
@@ -139,7 +143,9 @@ describe('cherry command', () => {
       ),
     )
 
-    const spawnCalls = mockSpawnSync.mock.calls as unknown as [string, string[]][]
+    const spawnCalls = (mockSpawnSync.mock.calls as unknown as [string, string[]][]).filter(
+      ([, args]) => Array.isArray(args),
+    )
     expect(spawnCalls.some(([, args]) => args.includes('refs/changes/45/12345/3'))).toBe(true)
   })
 
@@ -200,7 +206,9 @@ describe('cherry command', () => {
       ),
     )
 
-    const spawnCalls = mockSpawnSync.mock.calls as unknown as [string, string[]][]
+    const spawnCalls = (mockSpawnSync.mock.calls as unknown as [string, string[]][]).filter(
+      ([, args]) => Array.isArray(args),
+    )
     expect(spawnCalls.some(([, args]) => args.includes('fetch') && args.includes('upstream'))).toBe(
       true,
     )
