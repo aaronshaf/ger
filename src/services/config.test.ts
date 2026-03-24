@@ -66,8 +66,6 @@ describe('ConfigService', () => {
         host: 'https://gerrit.example.com',
         username: 'envuser',
         password: 'envpass123',
-        aiAutoDetect: true,
-        aiTool: undefined,
       })
     })
 

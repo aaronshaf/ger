@@ -10,41 +10,7 @@ import type { GerritCredentials } from '@/schemas/gerrit'
 import { AppConfig } from '@/schemas/config'
 import { Schema } from '@effect/schema'
 import { input, password } from '@inquirer/prompts'
-import { spawn } from 'node:child_process'
 import { normalizeGerritHost } from '@/utils/url-parser'
-
-// Check if a command exists on the system
-const checkCommandExists = (command: string): Promise<boolean> =>
-  new Promise((resolve) => {
-    const child = spawn('which', [command], { stdio: 'ignore' })
-    child.on('close', (code) => {
-      resolve(code === 0)
-    })
-    child.on('error', () => {
-      resolve(false)
-    })
-  })
-
-// AI tools to check for in order of preference
-const AI_TOOLS = ['claude', 'llm', 'opencode', 'gemini'] as const
-
-// Effect wrapper for detecting available AI tools
-const detectAvailableAITools = () =>
-  Effect.tryPromise({
-    try: async () => {
-      const availableTools: string[] = []
-
-      for (const tool of AI_TOOLS) {
-        const exists = await checkCommandExists(tool)
-        if (exists) {
-          availableTools.push(tool)
-        }
-      }
-
-      return availableTools
-    },
-    catch: (error) => new ConfigError({ message: `Failed to detect AI tools: ${error}` }),
-  })
 
 // Effect wrapper for getting existing config
 const getExistingConfig = (configService: ConfigServiceImpl) =>
@@ -124,8 +90,8 @@ const verifyCredentials = (credentials: GerritCredentials) =>
 // Pure Effect-based setup implementation using inquirer
 const setupEffect = (configService: ConfigServiceImpl) =>
   pipe(
-    Effect.all([getExistingConfig(configService), detectAvailableAITools()]),
-    Effect.flatMap(([existingConfig, availableTools]) =>
+    getExistingConfig(configService),
+    Effect.flatMap((existingConfig) =>
       pipe(
         Console.log(chalk.bold('🔧 Gerrit CLI Setup')),
         Effect.flatMap(() => Console.log('')),
@@ -186,26 +152,6 @@ const setupEffect = (configService: ConfigServiceImpl) =>
                   ''
 
                 console.log('')
-                console.log(chalk.yellow('Optional: AI Configuration'))
-
-                // Show detected AI tools
-                if (availableTools.length > 0) {
-                  console.log(chalk.dim(`Detected AI tools: ${availableTools.join(', ')}`))
-                }
-
-                // Get default suggestion — no default to claude
-                const defaultCommand = existingConfig?.aiTool || (availableTools[0] ?? '')
-
-                // AI tool command with smart default
-                const aiToolCommand = await input({
-                  message:
-                    availableTools.length > 0
-                      ? 'AI tool command (detected from system)'
-                      : 'AI tool command (e.g., claude, llm, opencode, gemini)',
-                  default: defaultCommand || undefined,
-                })
-
-                console.log('')
                 console.log(chalk.yellow('Optional: CI Retrigger'))
                 console.log(
                   chalk.dim(
@@ -223,10 +169,6 @@ const setupEffect = (configService: ConfigServiceImpl) =>
                   host: normalizeGerritHost(host),
                   username: username.trim(),
                   password: passwordValue,
-                  ...(aiToolCommand && {
-                    aiTool: aiToolCommand,
-                  }),
-                  aiAutoDetect: !aiToolCommand,
                   ...(retriggerComment.trim() && {
                     retriggerComment: retriggerComment.trim(),
                   }),

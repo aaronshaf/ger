@@ -4,14 +4,12 @@ import * as path from 'node:path'
 import { Schema } from '@effect/schema'
 import { Context, Effect, Layer } from 'effect'
 import { GerritCredentials } from '@/schemas/gerrit'
-import { AiConfig, AppConfig, aiConfigFromFlat, migrateFromNestedConfig } from '@/schemas/config'
+import { AppConfig, migrateFromNestedConfig } from '@/schemas/config'
 
 export interface ConfigServiceImpl {
   readonly getCredentials: Effect.Effect<GerritCredentials, ConfigError>
   readonly saveCredentials: (credentials: GerritCredentials) => Effect.Effect<void, ConfigError>
   readonly deleteCredentials: Effect.Effect<void, ConfigError>
-  readonly getAiConfig: Effect.Effect<AiConfig, ConfigError>
-  readonly saveAiConfig: (config: AiConfig) => Effect.Effect<void, ConfigError>
   readonly getFullConfig: Effect.Effect<AppConfig, ConfigError>
   readonly saveFullConfig: (config: AppConfig) => Effect.Effect<void, ConfigError>
   readonly getRetriggerComment: Effect.Effect<string | undefined, ConfigError>
@@ -55,7 +53,6 @@ const readEnvConfig = (): unknown | null => {
       host: GERRIT_HOST,
       username: GERRIT_USERNAME,
       password: GERRIT_PASSWORD,
-      aiAutoDetect: true,
     }
   }
 
@@ -181,14 +178,11 @@ export const ConfigServiceLive: Layer.Layer<ConfigService, never, never> = Layer
         // Get existing config or create new one
         const existingConfig = yield* getFullConfig.pipe(
           Effect.orElseSucceed(() => {
-            // Create default config using Schema validation instead of type assertion
             const defaultConfig = {
               host: validatedCredentials.host,
               username: validatedCredentials.username,
               password: validatedCredentials.password,
-              aiAutoDetect: true,
             }
-            // Validate the default config structure
             return Schema.decodeUnknownSync(AppConfig)(defaultConfig)
           }),
         )
@@ -214,31 +208,6 @@ export const ConfigServiceLive: Layer.Layer<ConfigService, never, never> = Layer
       }
     })
 
-    const getAiConfig = Effect.gen(function* () {
-      const config = yield* getFullConfig
-      return aiConfigFromFlat(config)
-    })
-
-    const saveAiConfig = (aiConfig: AiConfig) =>
-      Effect.gen(function* () {
-        // Validate AI config using schema
-        const validatedAiConfig = yield* Schema.decodeUnknown(AiConfig)(aiConfig).pipe(
-          Effect.mapError(() => new ConfigError({ message: 'Invalid AI configuration format' })),
-        )
-
-        // Get existing config
-        const existingConfig = yield* getFullConfig
-
-        // Update AI config in flat structure
-        const updatedConfig: AppConfig = {
-          ...existingConfig,
-          aiTool: validatedAiConfig.tool,
-          aiAutoDetect: validatedAiConfig.autoDetect,
-        }
-
-        yield* saveFullConfig(updatedConfig)
-      })
-
     const getRetriggerComment = Effect.gen(function* () {
       const config = yield* getFullConfig.pipe(Effect.orElseSucceed(() => null))
       return config?.retriggerComment
@@ -254,8 +223,6 @@ export const ConfigServiceLive: Layer.Layer<ConfigService, never, never> = Layer
       getCredentials,
       saveCredentials,
       deleteCredentials,
-      getAiConfig,
-      saveAiConfig,
       getFullConfig,
       saveFullConfig,
       getRetriggerComment,

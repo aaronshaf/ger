@@ -2,7 +2,7 @@ import { describe, test, expect } from 'bun:test'
 import { Effect } from 'effect'
 import { ConfigService, ConfigError, ConfigServiceLive } from '@/services/config'
 import { GerritCredentials } from '@/schemas/gerrit'
-import { AiConfig, AppConfig } from '@/schemas/config'
+import { AppConfig } from '@/schemas/config'
 
 describe('Config Service Simple Tests', () => {
   describe('ConfigError', () => {
@@ -41,8 +41,6 @@ describe('Config Service Simple Tests', () => {
       expect(typeof service.getCredentials).toBe('object') // Effect object
       expect(typeof service.saveCredentials).toBe('function')
       expect(typeof service.deleteCredentials).toBe('object') // Effect object
-      expect(typeof service.getAiConfig).toBe('object') // Effect object
-      expect(typeof service.saveAiConfig).toBe('function')
       expect(typeof service.getFullConfig).toBe('object') // Effect object
       expect(typeof service.saveFullConfig).toBe('function')
     })
@@ -64,37 +62,15 @@ describe('Config Service Simple Tests', () => {
       expect(validCredentials.password).toBe('testpass')
     })
 
-    test('should validate valid AI config schema', () => {
-      const validAiConfig: AiConfig = {
-        autoDetect: true,
-      }
-
-      expect(validAiConfig.autoDetect).toBe(true)
-    })
-
-    test('should validate AI config with tool', () => {
-      const validAiConfig: AiConfig = {
-        autoDetect: false,
-        tool: 'claude',
-      }
-
-      expect(validAiConfig.autoDetect).toBe(false)
-      expect(validAiConfig.tool).toBe('claude')
-    })
-
     test('should validate full app config schema', () => {
       const validAppConfig: AppConfig = {
         host: 'https://gerrit.example.com',
         username: 'testuser',
         password: 'testpass',
-        aiAutoDetect: true,
-        aiTool: 'claude',
       }
 
       expect(validAppConfig.host).toBe('https://gerrit.example.com')
       expect(validAppConfig.username).toBe('testuser')
-      expect(validAppConfig.aiAutoDetect).toBe(true)
-      expect(validAppConfig.aiTool).toBe('claude')
     })
   })
 })

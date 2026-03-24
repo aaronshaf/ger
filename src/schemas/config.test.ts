@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { Schema } from '@effect/schema'
 import { Effect } from 'effect'
-import { AppConfig, AiConfig, aiConfigFromFlat, migrateFromNestedConfig } from './config'
+import { AppConfig, migrateFromNestedConfig } from './config'
 
 describe('Config Schemas', () => {
   describe('AppConfig (Flat Structure)', () => {
@@ -10,15 +10,13 @@ describe('Config Schemas', () => {
         host: 'https://gerrit.example.com',
         username: 'testuser',
         password: 'testpass123',
-        aiTool: 'claude' as const,
-        aiAutoDetect: true,
       }
 
       const result = Schema.decodeUnknownSync(AppConfig)(validConfig)
       expect(result).toEqual(validConfig)
     })
 
-    test('validates minimal flat config with defaults', () => {
+    test('validates minimal flat config', () => {
       const minimalConfig = {
         host: 'https://gerrit.example.com',
         username: 'testuser',
@@ -26,11 +24,7 @@ describe('Config Schemas', () => {
       }
 
       const result = Schema.decodeUnknownSync(AppConfig)(minimalConfig)
-      expect(result).toEqual({
-        ...minimalConfig,
-        aiAutoDetect: true, // default value
-        aiTool: undefined,
-      })
+      expect(result).toEqual(minimalConfig)
     })
 
     test('rejects invalid host URL', () => {
@@ -62,89 +56,9 @@ describe('Config Schemas', () => {
 
       expect(() => Schema.decodeUnknownSync(AppConfig)(invalidConfig)).toThrow()
     })
-
-    test('validates all AI tool options', () => {
-      const tools = ['claude', 'llm', 'opencode', 'gemini'] as const
-
-      tools.forEach((tool) => {
-        const config = {
-          host: 'https://gerrit.example.com',
-          username: 'testuser',
-          password: 'testpass123',
-          aiTool: tool,
-        }
-
-        const result = Schema.decodeUnknownSync(AppConfig)(config)
-        expect(result.aiTool).toBe(tool)
-      })
-    })
-
-    test('rejects invalid AI tool', () => {
-      const invalidConfig = {
-        host: 'https://gerrit.example.com',
-        username: 'testuser',
-        password: 'testpass123',
-        aiTool: 'invalid-tool',
-      }
-
-      expect(() => Schema.decodeUnknownSync(AppConfig)(invalidConfig)).toThrow()
-    })
-  })
-
-  describe('Legacy AiConfig (Backward Compatibility)', () => {
-    test('validates legacy AI config structure', () => {
-      const validAiConfig = {
-        tool: 'claude' as const,
-        autoDetect: false,
-      }
-
-      const result = Schema.decodeUnknownSync(AiConfig)(validAiConfig)
-      expect(result).toEqual(validAiConfig)
-    })
-
-    test('validates minimal legacy AI config with defaults', () => {
-      const minimalAiConfig = {}
-
-      const result = Schema.decodeUnknownSync(AiConfig)(minimalAiConfig)
-      expect(result).toEqual({
-        autoDetect: true, // default value
-        tool: undefined,
-      })
-    })
   })
 
   describe('Helper Functions', () => {
-    test('aiConfigFromFlat converts flat config to legacy AI config', () => {
-      const flatConfig = {
-        host: 'https://gerrit.example.com',
-        username: 'testuser',
-        password: 'testpass123',
-        aiTool: 'claude' as const,
-        aiAutoDetect: false,
-      }
-
-      const aiConfig = aiConfigFromFlat(flatConfig)
-      expect(aiConfig).toEqual({
-        tool: 'claude',
-        autoDetect: false,
-      })
-    })
-
-    test('aiConfigFromFlat handles undefined AI options', () => {
-      const flatConfig = {
-        host: 'https://gerrit.example.com',
-        username: 'testuser',
-        password: 'testpass123',
-        aiAutoDetect: true,
-      }
-
-      const aiConfig = aiConfigFromFlat(flatConfig)
-      expect(aiConfig).toEqual({
-        tool: undefined,
-        autoDetect: true,
-      })
-    })
-
     test('migrateFromNestedConfig converts old nested format', () => {
       const nestedConfig = {
         credentials: {
@@ -152,8 +66,25 @@ describe('Config Schemas', () => {
           username: 'testuser',
           password: 'testpass123',
         },
+      }
+
+      const flatConfig = migrateFromNestedConfig(nestedConfig)
+      expect(flatConfig).toEqual({
+        host: 'https://gerrit.example.com',
+        username: 'testuser',
+        password: 'testpass123',
+      })
+    })
+
+    test('migrateFromNestedConfig ignores legacy AI config fields', () => {
+      const nestedConfig = {
+        credentials: {
+          host: 'https://gerrit.example.com',
+          username: 'testuser',
+          password: 'testpass123',
+        },
         ai: {
-          tool: 'claude' as const,
+          tool: 'claude',
           autoDetect: false,
         },
       }
@@ -163,50 +94,6 @@ describe('Config Schemas', () => {
         host: 'https://gerrit.example.com',
         username: 'testuser',
         password: 'testpass123',
-        aiTool: 'claude',
-        aiAutoDetect: false,
-      })
-    })
-
-    test('migrateFromNestedConfig handles missing AI config', () => {
-      const nestedConfig = {
-        credentials: {
-          host: 'https://gerrit.example.com',
-          username: 'testuser',
-          password: 'testpass123',
-        },
-      }
-
-      const flatConfig = migrateFromNestedConfig(nestedConfig)
-      expect(flatConfig).toEqual({
-        host: 'https://gerrit.example.com',
-        username: 'testuser',
-        password: 'testpass123',
-        aiTool: undefined,
-        aiAutoDetect: true, // default
-      })
-    })
-
-    test('migrateFromNestedConfig handles partial AI config', () => {
-      const nestedConfig = {
-        credentials: {
-          host: 'https://gerrit.example.com',
-          username: 'testuser',
-          password: 'testpass123',
-        },
-        ai: {
-          tool: 'llm' as const,
-          // autoDetect missing
-        },
-      }
-
-      const flatConfig = migrateFromNestedConfig(nestedConfig)
-      expect(flatConfig).toEqual({
-        host: 'https://gerrit.example.com',
-        username: 'testuser',
-        password: 'testpass123',
-        aiTool: 'llm',
-        aiAutoDetect: true, // default when missing
       })
     })
   })
@@ -217,8 +104,6 @@ describe('Config Schemas', () => {
         host: 'https://gerrit.example.com',
         username: 'testuser',
         password: 'testpass123',
-        aiTool: 'claude' as const,
-        aiAutoDetect: true,
       }
 
       const result = await Effect.gen(function* () {

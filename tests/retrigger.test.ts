@@ -40,7 +40,7 @@ describe('retrigger command', () => {
   })
 
   it('posts the retrigger comment when change-id is explicit and comment is configured', async () => {
-    const mockConfig = createMockConfigService(undefined, undefined, '__TRIGGER__')
+    const mockConfig = createMockConfigService(undefined, '__TRIGGER__')
 
     await Effect.runPromise(
       retriggerCommand('12345', {}).pipe(
@@ -54,7 +54,7 @@ describe('retrigger command', () => {
   })
 
   it('posts to the given change-id', async () => {
-    const mockConfig = createMockConfigService(undefined, undefined, '__TRIGGER__')
+    const mockConfig = createMockConfigService(undefined, '__TRIGGER__')
 
     let postedChangeId = ''
     server.use(
@@ -123,7 +123,7 @@ describe('retrigger command', () => {
   })
 
   it('outputs JSON on success', async () => {
-    const mockConfig = createMockConfigService(undefined, undefined, '__TRIGGER__')
+    const mockConfig = createMockConfigService(undefined, '__TRIGGER__')
 
     const logs: string[] = []
     console.log = (msg: string) => logs.push(msg)
@@ -141,7 +141,7 @@ describe('retrigger command', () => {
   })
 
   it('outputs XML on success', async () => {
-    const mockConfig = createMockConfigService(undefined, undefined, '__TRIGGER__')
+    const mockConfig = createMockConfigService(undefined, '__TRIGGER__')
 
     const logs: string[] = []
     console.log = (msg: string) => logs.push(msg)
